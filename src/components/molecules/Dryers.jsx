@@ -2,10 +2,12 @@ import Subtitle from "../atoms/Subtitle";
 import React, { useEffect, useState } from "react";
 
 export default function Dryers() {
+  const [suhu, setSuhu] = useState(0); // State untuk menyimpan data suhu
+
   const stats = [
     {
       title: "Oli Dryer 1",
-      count: 0,
+      count: suhu, // Menggunakan data suhu dari state
       icon: (
         <svg
           className="w-6 h-6 text-gray-800 dark:text-amber-400"
@@ -62,23 +64,22 @@ export default function Dryers() {
     },
   ];
 
-  const [suhu, setSuhu] = useState(null);
-
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch(
-          "https://blynk.cloud/external/api/get?token=A3toImYemB9KLC1SeJxMg-OhG2OaVk_W&V0"
-        );
-        const data = await res.text(); // API Blynk return string
-        setSuhu(data);
+        const response = await fetch("http://localhost:5000/api/suhu");
+        const data = await response.json();
+        setSuhu(parseFloat(data.suhu)); // Tampilkan data asli tanpa pembulatan
       } catch (err) {
         console.error("Gagal ambil data:", err);
       }
     };
 
+    // Fetch initial data
     fetchData();
-    const interval = setInterval(fetchData, 2000); // refresh 2 detik
+
+    // Refresh setiap 2 detik
+    const interval = setInterval(fetchData, 2000);
 
     return () => clearInterval(interval);
   }, []);
