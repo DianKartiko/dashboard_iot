@@ -6,17 +6,20 @@ import Footer from "../atoms/Footer";
 
 export default function MainTemplates() {
   return (
-    <>
-      <Sidebar></Sidebar>
-      <div className="p-4 sm:ml-64 bg-grey-50">
-        <Title></Title>
+    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Sidebar */}
+      <Sidebar />
+
+      {/* Main Content */}
+      <div className="flex-1 p-4 sm:ml-64">
+        <Title />
         {/* Dryers */}
-        <Dryers></Dryers>
-        {/* Chart.js */}
-        <Charts></Charts>
-        {/* Footers */}
-        <Footer></Footer>
+        <Dryers />
+        {/* Charts */}
+        <Charts />
+        {/* Footer */}
+        <Footer />
       </div>
-    </>
+    </div>
   );
 }

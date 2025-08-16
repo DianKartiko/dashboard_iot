@@ -1,18 +1,20 @@
-import { useState } from "react";
 import "./index.css";
 import MainTemplates from "./components/pages/MainTemplates";
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
+import NotFound from "./components/pages/404NotFound";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 function App() {
   return (
-    <div className="bg-gray-100 dark:bg-gray-950">
-      <MainTemplates></MainTemplates>
-    </div>
+    <Router>
+      <div className="bg-gray-100 dark:bg-gray-950 min-h-screen">
+        <Routes>
+          <Route path="/" element={<MainTemplates />} />
+          {/* Tambahan route kalau ada page lain */}
+          {/* <Route path="/settings" element={<Settings />} /> */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </div>
+    </Router>
   );
 }
 
