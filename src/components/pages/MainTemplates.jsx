@@ -1,6 +1,8 @@
 import Title from "../atoms/Title";
+import Charts from "../molecules/Charts";
 import Dryers from "../molecules/Dryers";
 import Sidebar from "../molecules/Sidebar";
+import Footer from "../atoms/Footer";
 
 export default function MainTemplates() {
   const stats = [
@@ -9,7 +11,7 @@ export default function MainTemplates() {
       count: 30,
       icon: (
         <svg
-          class="w-6 h-6 text-gray-800 dark:text-amber-400"
+          className="w-6 h-6 text-gray-800 dark:text-amber-400"
           aria-hidden="true"
           xmlns="http://www.w3.org/2000/svg"
           width="24"
@@ -28,7 +30,7 @@ export default function MainTemplates() {
       count: 30,
       icon: (
         <svg
-          class="w-6 h-6 text-gray-800 dark:text-pink-500"
+          className="w-6 h-6 text-gray-800 dark:text-pink-500"
           aria-hidden="true"
           xmlns="http://www.w3.org/2000/svg"
           width="24"
@@ -47,7 +49,7 @@ export default function MainTemplates() {
       count: 30,
       icon: (
         <svg
-          class="w-6 h-6 text-gray-800 dark:text-sky-500"
+          className="w-6 h-6 text-gray-800 dark:text-sky-500"
           aria-hidden="true"
           xmlns="http://www.w3.org/2000/svg"
           width="24"
@@ -66,11 +68,14 @@ export default function MainTemplates() {
   return (
     <>
       <Sidebar></Sidebar>
-      <div class="p-4 sm:ml-64 bg-grey-50">
+      <div className="p-4 sm:ml-64 bg-grey-50">
         <Title></Title>
         {/* Dryers */}
         <Dryers></Dryers>
         {/* Chart.js */}
+        <Charts></Charts>
+        {/* Footers */}
+        <Footer></Footer>
       </div>
     </>
   );
