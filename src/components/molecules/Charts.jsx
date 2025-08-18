@@ -13,93 +13,224 @@ import {
 } from "recharts";
 
 export default function Charts() {
-  const [chartData, setChartData] = useState([
-    { time: "08:00", dryer1: 120, dryer2: 100, dryer3: 90 },
-    { time: "09:00", dryer1: 135, dryer2: 110, dryer3: 95 },
-    { time: "10:00", dryer1: 140, dryer2: 115, dryer3: 100 },
-    { time: "11:00", dryer1: 150, dryer2: 120, dryer3: 105 },
-    { time: "12:00", dryer1: 160, dryer2: 125, dryer3: 110 },
-    { time: "13:00", dryer1: 155, dryer2: 130, dryer3: 120 },
-    { time: "14:00", dryer1: 165, dryer2: 135, dryer3: 125 },
-  ]);
+  // State untuk LineChart (data 10 menit)
+  const [chartData, setChartData] = useState([]);
 
+  // State untuk BarChart (data harian)
+  const [dailyData, setDailyData] = useState([]);
+
+  // State untuk current temperature
   const [currentTemp, setCurrentTemp] = useState(null);
 
-  // Fungsi untuk mendapatkan waktu saat ini dalam format HH:MM
-  const getCurrentTime = () => {
-    const now = new Date();
-    return now.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
+  // State untuk loading dan error handling
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // === fetchTodayAggregateData (LineChart, 10 menit interval) ===
+  const fetchTodayAggregateData = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/api/aggregate/today");
+      const result = await response.json();
+
+      if (
+        response.ok &&
+        result.success &&
+        result.data &&
+        Array.isArray(result.data.aggregates) &&
+        result.data.aggregates.length > 0
+      ) {
+        // Format langsung dari database aggregate
+        const formattedData = result.data.aggregates.map((item) => ({
+          time: item.timeSlot, // contoh: "10:00", "10:10"
+          dryer1: parseFloat(item.meanTemp), // ambil hanya Dryer 1 (asli dari DB)
+        }));
+
+        setChartData(formattedData);
+      } else {
+        console.warn(
+          "⚠️ Tidak ada data aggregate hari ini, fallback ke simulasi..."
+        );
+        await generateSimulatedLineData();
+      }
+    } catch (err) {
+      console.error("❌ Error fetch aggregate today:", err);
+      await generateSimulatedLineData();
+    }
   };
 
-  // Fetch data dari API
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch("http://localhost:5000/api/suhu");
-        const data = await response.json();
-        const newTemp = parseFloat(data.suhu);
+  // Generate data simulasi untuk LineChart jika tidak ada data agregasi
+  const generateSimulatedLineData = async () => {
+    try {
+      console.log("Generating simulated line data...");
+      const baseTemp = currentTemp || 25;
+      const now = new Date();
+      const simulatedData = [];
 
-        if (!isNaN(newTemp)) {
-          setCurrentTemp(newTemp);
+      for (let i = 9; i >= 0; i--) {
+        const slotTime = new Date(now.getTime() - i * 10 * 60 * 1000); // mundur 10 menit
+        const hour = slotTime.getHours().toString().padStart(2, "0");
+        const minute = (Math.floor(slotTime.getMinutes() / 10) * 10)
+          .toString()
+          .padStart(2, "0");
+        const timeSlot = `${hour}:${minute}`;
 
-          // Update chart data dengan data real-time
-          setChartData((prevData) => {
-            const newData = [...prevData];
-            const currentTime = getCurrentTime();
+        // ±2°C dari base
+        const tempVariation = (Math.random() - 0.5) * 4;
+        const dryer1Temp = Math.max(0, baseTemp + tempVariation);
 
-            // Cari apakah waktu saat ini sudah ada di data
-            const existingIndex = newData.findIndex(
-              (item) => item.time === currentTime
-            );
+        simulatedData.push({
+          time: timeSlot,
+          dryer1: Math.round(dryer1Temp * 10) / 10,
+        });
+      }
 
-            if (existingIndex >= 0) {
-              // Update data yang sudah ada
-              newData[existingIndex] = {
-                ...newData[existingIndex],
-                dryer1: newTemp,
-              };
-            } else {
-              // Tambah data baru dan jaga maksimal 10 data points
-              const newEntry = {
-                time: currentTime,
-                dryer1: newTemp,
-                dryer2: prevData[prevData.length - 1]?.dryer2 || 100, // Pertahankan nilai sebelumnya
-                dryer3: prevData[prevData.length - 1]?.dryer3 || 90, // Pertahankan nilai sebelumnya
-              };
+      console.log("✅ Simulated data:", simulatedData);
+      setChartData(simulatedData);
+    } catch (err) {
+      console.error("Error generating simulated data:", err);
+    }
+  };
 
-              newData.push(newEntry);
+  // Fetch current temperature
+  const fetchCurrentTemperature = async () => {
+    try {
+      console.log("Fetching current temperature...");
 
-              // Jaga maksimal 10 data points
-              if (newData.length > 10) {
-                newData.shift();
-              }
-            }
+      // Gunakan endpoint yang sudah pasti ada dari server.mjs
+      const response = await fetch("http://localhost:5000/api/suhu");
+      const data = await response.json();
+      console.log("Temperature response:", data);
 
-            return newData;
-          });
+      const newTemp = parseFloat(data.suhu);
+
+      if (!isNaN(newTemp)) {
+        setCurrentTemp(newTemp);
+        console.log("Current temp set to:", newTemp);
+      }
+    } catch (err) {
+      console.error("Error fetching current temperature:", err);
+      // Set default temp jika gagal
+      setCurrentTemp(25);
+    }
+  };
+
+  // === fetchHistoricalData (BarChart, rata-rata harian) ===
+  const fetchHistoricalData = async () => {
+    try {
+      const dailyAverages = [];
+      const today = new Date();
+
+      for (let i = 6; i >= 0; i--) {
+        const targetDate = new Date(today);
+        targetDate.setDate(today.getDate() - i);
+        const dateString = targetDate.toISOString().split("T")[0];
+
+        const response = await fetch(
+          `http://localhost:5000/api/sensor/history/${dateString}`
+        );
+        const result = await response.json();
+
+        let avgTemp = 0;
+        const dayLabel = targetDate.toLocaleDateString("id-ID", {
+          weekday: "short",
+          day: "2-digit",
+        });
+
+        if (result.success && result.data) {
+          if (result.data.source === "backup" && result.data.backup) {
+            avgTemp = result.data.backup.avgDailyTemp;
+          } else if (
+            result.data.source === "aggregate" &&
+            result.data.aggregates
+          ) {
+            const temps = result.data.aggregates.map((item) => item.meanTemp);
+            avgTemp = temps.reduce((sum, temp) => sum + temp, 0) / temps.length;
+            avgTemp = Math.round(avgTemp * 100) / 100;
+          }
         }
+
+        // Fallback → kalau hari ini kosong, pakai suhu terakhir
+        if (avgTemp === 0 && i === 0 && currentTemp > 0) {
+          avgTemp = currentTemp;
+        }
+
+        dailyAverages.push({
+          time: dayLabel,
+          dryer1: avgTemp || 0, // hanya Dryer 1
+        });
+      }
+
+      setDailyData(dailyAverages);
+    } catch (err) {
+      console.error("❌ Error fetching historical data:", err);
+    }
+  };
+
+  // Initial data fetch
+  useEffect(() => {
+    const fetchAllData = async () => {
+      setLoading(true);
+      try {
+        // Fetch current temp first
+        await fetchCurrentTemperature();
+
+        // Wait a bit for currentTemp to be set
+        setTimeout(async () => {
+          await Promise.all([fetchTodayAggregateData(), fetchHistoricalData()]);
+          setLoading(false);
+        }, 500);
       } catch (err) {
-        console.error("Gagal ambil data:", err);
+        setError("Gagal memuat data");
+        console.error("Error in initial fetch:", err);
+        setLoading(false);
       }
     };
 
-    // Fetch initial data
-    fetchData();
+    fetchAllData();
+  }, []);
 
-    // Update setiap 5 detik (sesuaikan dengan kebutuhan)
-    const interval = setInterval(fetchData, 5000);
+  // Update current temperature dan LineChart setiap 30 detik
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchCurrentTemperature();
+      fetchTodayAggregateData();
+    }, 2000);
 
     return () => clearInterval(interval);
   }, []);
 
+  // Update BarChart setiap 5 menit
+  useEffect(() => {
+    const dailyInterval = setInterval(() => {
+      fetchHistoricalData();
+    }, 300000); // 5 menit
+
+    return () => clearInterval(dailyInterval);
+  }, [currentTemp]);
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-md">
+          <div className="animate-pulse">
+            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-1/2 mb-4"></div>
+            <div className="h-64 bg-gray-200 dark:bg-gray-600 rounded"></div>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-md">
+          <div className="animate-pulse">
+            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-1/2 mb-4"></div>
+            <div className="h-64 bg-gray-200 dark:bg-gray-600 rounded"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-        {/* Line Chart */}
+        {/* Line Chart - Data per 10 menit */}
         <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-md">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
@@ -114,10 +245,20 @@ export default function Charts() {
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="time" />
-              <YAxis />
+              {/* XAxis disembunyikan sesuai permintaan */}
+              <XAxis
+                dataKey="time"
+                tick={false}
+                axisLine={false}
+                tickLine={false}
+                height={0}
+              />
+              <YAxis domain={["dataMin - 5", "dataMax + 5"]} />
               <Tooltip
-                formatter={(value, name) => [`${value}°C`, name]}
+                formatter={(value, name) => [
+                  `${Math.round(value * 10) / 10}°C`,
+                  name,
+                ]}
                 labelFormatter={(label) => `Waktu: ${label}`}
               />
               <Legend />
@@ -130,42 +271,41 @@ export default function Charts() {
                 dot={{ r: 4 }}
                 name="Dryer 1 (Real-time)"
               />
-              <Line
-                type="monotone"
-                dataKey="dryer2"
-                stroke="#93c5fd"
-                strokeWidth={2}
-                name="Dryer 2"
-              />
-              <Line
-                type="monotone"
-                dataKey="dryer3"
-                stroke="#86efac"
-                strokeWidth={2}
-                name="Dryer 3"
-              />
             </LineChart>
           </ResponsiveContainer>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            Data per 10 menit hari ini • {chartData.length} data points •
+            {chartData.length > 0 &&
+              ` Range: ${Math.min(
+                ...chartData.map((d) => Math.min(d.dryer1, d.dryer2, d.dryer3))
+              )}°C - ${Math.max(
+                ...chartData.map((d) => Math.max(d.dryer1, d.dryer2, d.dryer3))
+              )}°C`}
+          </div>
         </div>
 
-        {/* Bar Chart */}
+        {/* Bar Chart - Rata-rata harian */}
         <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-md">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
               Bar Chart - Suhu Dryer
             </h2>
             <div className="text-xs text-gray-500 dark:text-gray-400">
-              Live Data
+              Rata-rata Harian
             </div>
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData}>
+            <BarChart data={dailyData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="time" />
+              {/* XLabel minimal - hanya label hari */}
+              <XAxis dataKey="time" tick={{ fontSize: 11 }} interval={0} />
               <YAxis />
               <Tooltip
-                formatter={(value, name) => [`${value}°C`, name]}
-                labelFormatter={(label) => `Waktu: ${label}`}
+                formatter={(value, name) => [
+                  `${Math.round(value * 10) / 10}°C`,
+                  name,
+                ]}
+                labelFormatter={(label) => `${label}`}
               />
               <Legend />
               <Bar
@@ -191,6 +331,9 @@ export default function Charts() {
               />
             </BarChart>
           </ResponsiveContainer>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            7 hari terakhir • Update setiap 5 menit
+          </div>
         </div>
       </div>
     </>
