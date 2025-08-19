@@ -6,13 +6,13 @@ import Footer from "../atoms/Footer";
 
 export default function MainTemplates() {
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
+    <>
       {/* Sidebar */}
       <Sidebar />
 
       {/* Main Content */}
       <div className="flex-1 p-4 sm:ml-64">
-        <Title />
+        <Title title={"Dashboard Statistic"} />
         {/* Dryers */}
         <Dryers />
         {/* Charts */}
@@ -20,6 +20,6 @@ export default function MainTemplates() {
         {/* Footer */}
         <Footer />
       </div>
-    </div>
+    </>
   );
 }
