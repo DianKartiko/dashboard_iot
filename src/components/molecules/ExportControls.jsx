@@ -1,4 +1,6 @@
+import { Download } from "lucide-react";
 import ButtonData from "../atoms/ButtonData";
+import Badge from "../atoms/Badge";
 
 const ExportControls = ({
   onExportCSV,

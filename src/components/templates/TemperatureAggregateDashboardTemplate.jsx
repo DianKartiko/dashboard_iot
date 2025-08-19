@@ -1,4 +1,32 @@
 import React, { useState, useEffect, useRef } from "react";
+import { Database, TrendingUp, Clock, Calendar } from "lucide-react";
+import StatsCard from "../molecules/StatsCard";
+import ExportControls from "../molecules/ExportControls";
+import TemperatureAggregateTable from "../organism/TemperatureAggregateTable";
+
+// MessageModal Component (Missing component)
+const MessageModal = ({ message, type, onClose }) => {
+  const bgColor = {
+    info: "bg-blue-50 border-blue-200 text-blue-800",
+    error: "bg-red-50 border-red-200 text-red-800",
+    success: "bg-green-50 border-green-200 text-green-800",
+    warning: "bg-yellow-50 border-yellow-200 text-yellow-800",
+  };
+
+  return (
+    <div className={`p-4 rounded-lg border mb-4 ${bgColor[type] || bgColor.info}`}>
+      <div className="flex justify-between items-center">
+        <p className="text-sm font-medium">{message}</p>
+        <button
+          onClick={onClose}
+          className="ml-4 text-gray-400 hover:text-gray-600"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const TemperatureAggregateDashboard = () => {
   const [aggregateData, setAggregateData] = useState([]);

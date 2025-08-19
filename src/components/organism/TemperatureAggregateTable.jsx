@@ -1,6 +1,8 @@
-import React from "react";
-import { Calendar, Clock, TrendingUp } from "lucide-react";
+import React, { useState } from "react";
+import { Calendar, Clock, TrendingUp, Database, CheckCircle, AlertTriangle } from "lucide-react";
 import ButtonData from "../atoms/ButtonData";
+import Badge from "../atoms/Badge";
+import TableHeader from "../molecules/TableHeader";
 
 const TemperatureAggregateTable = ({
   data,
