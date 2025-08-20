@@ -13,8 +13,12 @@ import {
   Area,
   AreaChart,
 } from "recharts";
+import { useAuth } from "../contexts/AuthContext"; // Import useAuth
 
 export default function Charts() {
+  // PERBAIKAN: Ambil token dari AuthContext
+  const { token } = useAuth();
+
   // State untuk LineChart (data 10 menit)
   const [chartData, setChartData] = useState([]);
 
@@ -35,17 +39,36 @@ export default function Charts() {
   // === fetchTodayAggregateData (LineChart, 10 menit interval) ===
   const fetchTodayAggregateData = async () => {
     try {
-      // PERBAIKAN: Gunakan endpoint yang benar
+      // PERBAIKAN: Validasi token terlebih dahulu
+      if (!token) {
+        console.warn("⚠️ No token available, using fallback data");
+        await generateFallbackData();
+        return;
+      }
+
       const response = await fetch(
-        "http://localhost:5000/api/sensor/aggregate/today"
+        "http://localhost:5000/api/sensor/aggregate/today",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
       );
 
       if (!response.ok) {
+        // PERBAIKAN: Handle status code yang berbeda
+        if (response.status === 401 || response.status === 403) {
+          setError("Unauthorized - Token expired or invalid");
+          setIsConnected(false);
+          await generateFallbackData();
+          return;
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log("Aggregate response:", result);
+      console.log("✅ Aggregate response:", result);
 
       if (result.success && result.data && result.data.aggregates) {
         const aggregates = result.data.aggregates;
@@ -58,7 +81,6 @@ export default function Charts() {
             minTemp: parseFloat(item.minTemp),
             maxTemp: parseFloat(item.maxTemp),
             sampleCount: item.sampleCount,
-            // Tambah data untuk area chart
             tempRange: parseFloat(item.maxTemp) - parseFloat(item.minTemp),
           }));
 
@@ -67,7 +89,7 @@ export default function Charts() {
           setError(null);
           setLastUpdate(new Date());
 
-          console.log("✅ Real data loaded:", formattedData);
+          console.log("✅ Real aggregate data loaded:", formattedData);
           return;
         }
       }
@@ -76,7 +98,7 @@ export default function Charts() {
       await fetchRealtimeStats();
     } catch (err) {
       console.error("❌ Error fetch aggregate today:", err);
-      setError("Gagal mengambil data agregasi");
+      setError(`Gagal mengambil data agregasi: ${err.message}`);
       setIsConnected(false);
 
       // Fallback ke realtime stats jika aggregate gagal
@@ -84,19 +106,36 @@ export default function Charts() {
     }
   };
 
-  // PERBAIKAN: Tambahkan fungsi untuk mengambil real-time stats
+  // PERBAIKAN: Tambahkan header Authorization untuk realtime stats
   const fetchRealtimeStats = async () => {
     try {
+      const headers = {
+        "Content-Type": "application/json",
+      };
+
+      // Tambahkan Authorization jika token tersedia
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
       const response = await fetch(
-        "http://localhost:5000/api/sensor/realtime/stats"
+        "http://localhost:5000/api/sensor/realtime/stats",
+        { headers }
       );
 
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          console.warn(
+            "⚠️ Realtime stats unauthorized, trying current temperature"
+          );
+          await fetchCurrentTemperature();
+          return;
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log("Realtime stats:", result);
+      console.log("✅ Realtime stats:", result);
 
       if (result.success && result.data && result.data.dataPoints) {
         const dataPoints = result.data.dataPoints;
@@ -116,7 +155,7 @@ export default function Charts() {
             return {
               time: timeString,
               temperature: parseFloat(point.temperature),
-              minTemp: parseFloat(point.temperature) - 1, // Estimasi range
+              minTemp: parseFloat(point.temperature) - 1,
               maxTemp: parseFloat(point.temperature) + 1,
               sampleCount: 1,
               tempRange: 2,
@@ -138,43 +177,72 @@ export default function Charts() {
       await fetchCurrentTemperature();
     } catch (err) {
       console.error("❌ Error fetching realtime stats:", err);
-      await generateFallbackData();
+      await fetchCurrentTemperature();
     }
   };
 
-  // Fetch current temperature dari endpoint yang ada
+  // PERBAIKAN: Tambahkan header Authorization untuk current temperature
   const fetchCurrentTemperature = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/sensor/current");
+      // Coba endpoint yang protected terlebih dahulu
+      if (token) {
+        try {
+          const response = await fetch(
+            "http://localhost:5000/api/sensor/current",
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.data) {
-          const newTemp = parseFloat(result.data.temperature);
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.data) {
+              const newTemp = parseFloat(result.data.temperature);
+              setCurrentTemp(newTemp);
+              setIsConnected(true);
+
+              // Jika tidak ada chart data, buat dari current temp
+              if (chartData.length === 0) {
+                await generateFallbackData(newTemp);
+              }
+              console.log(
+                "✅ Current temperature from protected endpoint:",
+                newTemp
+              );
+              return;
+            }
+          }
+        } catch (protectedError) {
+          console.warn("⚠️ Protected endpoint failed, trying fallback");
+        }
+      }
+
+      // Fallback ke endpoint lama (tidak protected)
+      const fallbackResponse = await fetch("http://localhost:5000/api/suhu");
+      if (fallbackResponse.ok) {
+        const fallbackData = await fallbackResponse.json();
+
+        if (fallbackData.suhu) {
+          const newTemp = parseFloat(fallbackData.suhu);
           setCurrentTemp(newTemp);
           setIsConnected(true);
 
-          // Jika tidak ada chart data, buat dari current temp
           if (chartData.length === 0) {
             await generateFallbackData(newTemp);
           }
+          console.log(
+            "✅ Current temperature from fallback endpoint:",
+            newTemp
+          );
           return;
         }
       }
 
-      // Fallback ke endpoint lama
-      const fallbackResponse = await fetch("http://localhost:5000/api/suhu");
-      const fallbackData = await fallbackResponse.json();
-
-      if (fallbackData.suhu) {
-        const newTemp = parseFloat(fallbackData.suhu);
-        setCurrentTemp(newTemp);
-        setIsConnected(true);
-
-        if (chartData.length === 0) {
-          await generateFallbackData(newTemp);
-        }
-      }
+      // Jika semua gagal, generate fallback data
+      throw new Error("All temperature endpoints failed");
     } catch (err) {
       console.error("❌ Error fetching current temperature:", err);
       setIsConnected(false);
@@ -210,15 +278,18 @@ export default function Charts() {
       }
 
       setChartData(fallbackData);
-      setError("Menggunakan data simulasi - Periksa koneksi database");
+      setError(
+        "Menggunakan data simulasi - Periksa koneksi database atau login"
+      );
+      setIsConnected(false);
       console.log("⚠️ Using fallback data:", fallbackData);
     } catch (err) {
-      console.error("Error generating fallback data:", err);
+      console.error("❌ Error generating fallback data:", err);
       setError("Gagal memuat data");
     }
   };
 
-  // === fetchHistoricalData (BarChart, rata-rata harian) ===
+  // PERBAIKAN: Tambahkan header Authorization untuk historical data
   const fetchHistoricalData = async () => {
     try {
       const dailyAverages = [];
@@ -230,10 +301,19 @@ export default function Charts() {
         const dateString = targetDate.toISOString().split("T")[0];
 
         try {
+          const headers = {
+            "Content-Type": "application/json",
+          };
+
+          // Tambahkan Authorization jika token tersedia
+          if (token) {
+            headers.Authorization = `Bearer ${token}`;
+          }
+
           const response = await fetch(
-            `http://localhost:5000/api/sensor/history/${dateString}`
+            `http://localhost:5000/api/sensor/history/${dateString}`,
+            { headers }
           );
-          const result = await response.json();
 
           let avgTemp = 0;
           let minTemp = 0;
@@ -244,25 +324,32 @@ export default function Charts() {
             day: "2-digit",
           });
 
-          if (result.success && result.data) {
-            if (result.data.source === "backup" && result.data.backup) {
-              avgTemp = result.data.backup.avgDailyTemp;
-              minTemp = result.data.backup.minDailyTemp;
-              maxTemp = result.data.backup.maxDailyTemp;
-            } else if (
-              result.data.source === "aggregate" &&
-              result.data.aggregates
-            ) {
-              const temps = result.data.aggregates.map((item) => item.meanTemp);
-              const mins = result.data.aggregates.map((item) => item.minTemp);
-              const maxs = result.data.aggregates.map((item) => item.maxTemp);
+          if (response.ok) {
+            const result = await response.json();
 
-              avgTemp =
-                temps.reduce((sum, temp) => sum + temp, 0) / temps.length;
-              minTemp = Math.min(...mins);
-              maxTemp = Math.max(...maxs);
+            if (result.success && result.data) {
+              if (result.data.source === "backup" && result.data.backup) {
+                avgTemp = result.data.backup.avgDailyTemp;
+                minTemp = result.data.backup.minDailyTemp;
+                maxTemp = result.data.backup.maxDailyTemp;
+              } else if (
+                result.data.source === "aggregate" &&
+                result.data.aggregates
+              ) {
+                const temps = result.data.aggregates.map(
+                  (item) => item.meanTemp
+                );
+                const mins = result.data.aggregates.map((item) => item.minTemp);
+                const maxs = result.data.aggregates.map((item) => item.maxTemp);
 
-              avgTemp = Math.round(avgTemp * 100) / 100;
+                if (temps.length > 0) {
+                  avgTemp =
+                    temps.reduce((sum, temp) => sum + temp, 0) / temps.length;
+                  minTemp = Math.min(...mins);
+                  maxTemp = Math.max(...maxs);
+                  avgTemp = Math.round(avgTemp * 100) / 100;
+                }
+              }
             }
           }
 
@@ -280,7 +367,7 @@ export default function Charts() {
             maxTemp: maxTemp || 0,
           });
         } catch (dayError) {
-          console.warn(`Error fetching data for ${dateString}:`, dayError);
+          console.warn(`⚠️ Error fetching data for ${dateString}:`, dayError);
 
           const dayLabel = targetDate.toLocaleDateString("id-ID", {
             weekday: "short",
@@ -297,51 +384,66 @@ export default function Charts() {
       }
 
       setDailyData(dailyAverages);
+      console.log("✅ Historical data loaded:", dailyAverages);
     } catch (err) {
       console.error("❌ Error fetching historical data:", err);
     }
   };
 
-  // Initial data fetch
+  // PERBAIKAN: Initial data fetch dengan proper error handling
   useEffect(() => {
     const fetchAllData = async () => {
       setLoading(true);
       setError(null);
 
       try {
+        console.log("🔄 Starting data fetch...");
+
         // Fetch data secara berurutan
         await fetchCurrentTemperature();
         await fetchTodayAggregateData();
         await fetchHistoricalData();
+
+        console.log("✅ All data fetched successfully");
       } catch (err) {
-        setError("Gagal memuat data dashboard");
-        console.error("Error in initial fetch:", err);
+        setError(`Gagal memuat data dashboard: ${err.message}`);
+        console.error("❌ Error in initial fetch:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAllData();
-  }, []);
+    // Hanya fetch jika component sudah mount
+    if (token !== undefined) {
+      // token bisa null atau string
+      fetchAllData();
+    }
+  }, [token]); // PERBAIKAN: Depend on token
 
   // Update real-time data setiap 10 detik
   useEffect(() => {
+    if (!token) return; // Tidak ada interval jika tidak ada token
+
     const realtimeInterval = setInterval(() => {
+      console.log("🔄 Updating realtime data...");
       fetchCurrentTemperature();
       fetchTodayAggregateData();
     }, 10000); // 10 detik
 
     return () => clearInterval(realtimeInterval);
-  }, []);
+  }, [token]); // PERBAIKAN: Depend on token
 
   // Update historical data setiap 5 menit
   useEffect(() => {
+    if (!token) return;
+
     const historicalInterval = setInterval(() => {
+      console.log("🔄 Updating historical data...");
       fetchHistoricalData();
     }, 300000); // 5 menit
 
     return () => clearInterval(historicalInterval);
-  }, []);
+  }, [token]); // PERBAIKAN: Depend on token
 
   // Custom tooltip untuk LineChart
   const CustomTooltip = ({ active, payload, label }) => {
@@ -388,6 +490,50 @@ export default function Charts() {
 
   return (
     <div className="w-full space-y-6">
+      {/* Data Summary Cards */}
+      {chartData.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            {
+              label: "Today Max",
+              value: Math.max(...chartData.map((d) => d.maxTemp)),
+              unit: "°C",
+              color: "text-pink-300",
+            },
+            {
+              label: "Today Min",
+              value: Math.min(...chartData.map((d) => d.minTemp)),
+              unit: "°C",
+              color: "text-teal-300",
+            },
+            {
+              label: "Avg Today",
+              value:
+                Math.round(
+                  (chartData.reduce((sum, d) => sum + d.temperature, 0) /
+                    chartData.length) *
+                    10
+                ) / 10,
+              unit: "°C",
+              color: "text-purple-300",
+            },
+          ].map((stat, index) => (
+            <div
+              key={index}
+              className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700"
+            >
+              <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                {stat.label}
+              </div>
+              <div className={`text-2xl font-bold ${stat.color}`}>
+                {stat.value}
+                {stat.unit}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Status Bar */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 p-4 rounded-xl border border-blue-100 dark:border-gray-600">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -401,6 +547,10 @@ export default function Charts() {
               <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
                 {isConnected ? "Connected" : "Disconnected"}
               </span>
+              {/* PERBAIKAN: Tampilkan status token */}
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                {token ? "🔐 Authenticated" : "🔓 Guest Mode"}
+              </div>
             </div>
             {currentTemp && (
               <div className="text-sm text-gray-600 dark:text-gray-300">
@@ -452,11 +602,7 @@ export default function Charts() {
                     <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#e5e7eb"
-                  dark:stroke="#374151"
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis
                   dataKey="time"
                   tick={{ fontSize: 12 }}
@@ -550,50 +696,6 @@ export default function Charts() {
           </div>
         </div>
       </div>
-
-      {/* Data Summary Cards */}
-      {chartData.length > 0 && (
-        <div className="grid grid-cols-3 md:grid-cols-3 gap-4">
-          {[
-            {
-              label: "Today Max",
-              value: Math.max(...chartData.map((d) => d.maxTemp)),
-              unit: "°C",
-              color: "text-pink-300",
-            },
-            {
-              label: "Today Min",
-              value: Math.min(...chartData.map((d) => d.minTemp)),
-              unit: "°C",
-              color: "text-teal-300",
-            },
-            {
-              label: "Avg Today",
-              value:
-                Math.round(
-                  (chartData.reduce((sum, d) => sum + d.temperature, 0) /
-                    chartData.length) *
-                    10
-                ) / 10,
-              unit: "°C",
-              color: "text-purple-300",
-            },
-          ].map((stat, index) => (
-            <div
-              key={index}
-              className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700"
-            >
-              <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                {stat.label}
-              </div>
-              <div className={`text-2xl font-bold ${stat.color}`}>
-                {stat.value}
-                {stat.unit}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

@@ -1,28 +1,136 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Database, TrendingUp, Clock, Calendar, Sun, Moon } from "lucide-react";
-import StatsCard from "../molecules/StatsCard";
+import { useAuth } from "../contexts/AuthContext"; // PERBAIKAN: Import useAuth
 import ExportControls from "../molecules/ExportControls";
 import TemperatureAggregateTable from "../organism/TemperatureAggregateTable";
-import ButtonData from "../atoms/ButtonData";
+import * as XLSX from "xlsx";
 
-// // Dark Mode Toggle Component
-// const DarkModeToggle = ({ darkMode, setDarkMode }) => {
-//   return (
-//     <ButtonData
-//       variant="outline"
-//       size="sm"
-//       onClick={() => setDarkMode(!darkMode)}
-//       icon={darkMode ? Sun : Moon}
-//       className="fixed top-4 right-4 z-50 shadow-lg"
-//     >
-//       <span className="hidden sm:inline">
-//         {darkMode ? "Light" : "Dark"} Mode
-//       </span>
-//     </ButtonData>
-//   );
-// };
+const exportToExcel = async () => {
+  setIsExporting(true);
+  if (aggregateData.length === 0) {
+    handleMessage("Tidak ada data untuk diekspor.", "error");
+    setIsExporting(false);
+    return;
+  }
 
-// MessageModal Component
+  try {
+    // PERBAIKAN: Buat data dalam format yang lebih baik untuk Excel
+    const excelData = aggregateData.map((record, index) => ({
+      No: index + 1,
+      ID: record.id,
+      Tanggal: new Date(record.date).toLocaleDateString("id-ID"),
+      "Waktu Slot": record.timeSlot,
+      "Suhu Rata-rata (°C)": Number(record.meanTemp.toFixed(2)),
+      "Suhu Minimum (°C)": Number(record.minTemp.toFixed(2)),
+      "Suhu Maksimum (°C)": Number(record.maxTemp.toFixed(2)),
+      "Jumlah Sample": record.sampleCount,
+      "Median (°C)": record.medianTemp
+        ? Number(record.medianTemp.toFixed(2))
+        : "N/A",
+      "Mode (°C)": record.modeTemp ? Number(record.modeTemp.toFixed(2)) : "N/A",
+      "Standar Deviasi": record.stdDev
+        ? Number(record.stdDev.toFixed(2))
+        : "N/A",
+      "Dibuat Pada": new Date(record.createdAt || record.date).toLocaleString(
+        "id-ID"
+      ),
+      "Status Export": record.isExported ? "Sudah Export" : "Belum Export",
+    }));
+
+    // PERBAIKAN: Buat workbook dengan multiple sheets
+    const workbook = XLSX.utils.book_new();
+
+    // Sheet 1: Data Utama
+    const mainSheet = XLSX.utils.json_to_sheet(excelData);
+
+    // PERBAIKAN: Set column widths untuk readability
+    const colWidths = [
+      { wch: 5 }, // No
+      { wch: 8 }, // ID
+      { wch: 12 }, // Tanggal
+      { wch: 10 }, // Waktu Slot
+      { wch: 18 }, // Suhu Rata-rata
+      { wch: 18 }, // Suhu Minimum
+      { wch: 18 }, // Suhu Maksimum
+      { wch: 15 }, // Jumlah Sample
+      { wch: 12 }, // Median
+      { wch: 12 }, // Mode
+      { wch: 15 }, // Standar Deviasi
+      { wch: 20 }, // Dibuat Pada
+      { wch: 15 }, // Status Export
+    ];
+    mainSheet["!cols"] = colWidths;
+
+    XLSX.utils.book_append_sheet(workbook, mainSheet, "Data Agregasi");
+
+    // Sheet 2: Summary/Statistics
+    const summaryData = [
+      { Metrik: "Total Records", Nilai: stats.totalRecords },
+      {
+        Metrik: "Suhu Rata-rata (°C)",
+        Nilai: Number(stats.avgTemp.toFixed(2)),
+      },
+      { Metrik: "Suhu Minimum (°C)", Nilai: Number(stats.minTemp.toFixed(2)) },
+      { Metrik: "Suhu Maksimum (°C)", Nilai: Number(stats.maxTemp.toFixed(2)) },
+      { Metrik: "Trend (%)", Nilai: Number(stats.trend.toFixed(2)) },
+      { Metrik: "Records Siap Export", Nilai: stats.aggregatesReady },
+      { Metrik: "Tanggal Export", Nilai: new Date().toLocaleString("id-ID") },
+    ];
+
+    const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+    summarySheet["!cols"] = [{ wch: 25 }, { wch: 15 }];
+    XLSX.utils.book_append_sheet(workbook, summarySheet, "Ringkasan");
+
+    // Sheet 3: System Status (jika ada)
+    if (systemStatus) {
+      const statusData = [
+        { Parameter: "Database Buffer", Nilai: systemStatus.databaseBuffer },
+        {
+          Parameter: "Pending Aggregates",
+          Nilai: systemStatus.pendingAggregates,
+        },
+        {
+          Parameter: "Processed Buffer",
+          Nilai: systemStatus.processedBuffer || 0,
+        },
+        { Parameter: "Export Time", Nilai: new Date().toISOString() },
+      ];
+
+      const statusSheet = XLSX.utils.json_to_sheet(statusData);
+      statusSheet["!cols"] = [{ wch: 20 }, { wch: 15 }];
+      XLSX.utils.book_append_sheet(workbook, statusSheet, "Status Sistem");
+    }
+
+    // PERBAIKAN: Generate filename dengan timestamp
+    const timestamp = new Date().toISOString().split("T")[0];
+    const timeString = new Date()
+      .toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+      .replace(":", "");
+    const fileName = `Temperature_Aggregates_${timestamp}_${timeString}.xlsx`;
+
+    // PERBAIKAN: Write dan download file
+    XLSX.writeFile(workbook, fileName, {
+      bookType: "xlsx",
+      type: "binary",
+    });
+
+    setLastExport(new Date().toISOString());
+    handleMessage(`Ekspor Excel berhasil! File: ${fileName}`, "success");
+
+    console.log(`✅ Excel export completed: ${fileName}`);
+  } catch (error) {
+    console.error("❌ Error exporting Excel:", error);
+    handleMessage(
+      `Terjadi kesalahan saat mengekspor Excel: ${error.message}`,
+      "error"
+    );
+  } finally {
+    setIsExporting(false);
+  }
+};
+
 const MessageModal = ({ message, type, onClose }) => {
   const bgColor = {
     info: "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200",
@@ -66,6 +174,9 @@ const MessageModal = ({ message, type, onClose }) => {
 };
 
 const TemperatureAggregateDashboard = () => {
+  // PERBAIKAN: Ambil token dari AuthContext
+  const { token } = useAuth();
+
   const [aggregateData, setAggregateData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
@@ -85,26 +196,6 @@ const TemperatureAggregateDashboard = () => {
   const intervalRef = useRef();
   const exportCheckRef = useRef();
 
-  // Dark mode effect
-  // useEffect(() => {
-  //   if (darkMode) {
-  //     document.documentElement.classList.add("dark");
-  //   } else {
-  //     document.documentElement.classList.remove("dark");
-  //   }
-  // }, [darkMode]);
-
-  // Initialize dark mode from system preference
-  // useEffect(() => {
-  //   const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-  //   setDarkMode(mediaQuery.matches);
-
-  //   const handleChange = (e) => setDarkMode(e.matches);
-  //   mediaQuery.addEventListener("change", handleChange);
-
-  //   return () => mediaQuery.removeEventListener("change", handleChange);
-  // }, []);
-
   const handleMessage = (msg, type = "info") => {
     setMessage({ text: msg, type });
     setTimeout(() => setMessage(null), 5000);
@@ -113,14 +204,42 @@ const TemperatureAggregateDashboard = () => {
   const fetchAggregateData = async () => {
     try {
       console.log("🔄 Fetching aggregate data from Prisma...");
+
+      // PERBAIKAN: Tambahkan authentication header
+      const headers = {
+        "Content-Type": "application/json",
+      };
+
+      // Tambahkan Authorization jika token tersedia
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
       const response = await fetch(
-        "http://localhost:5000/api/sensor/aggregate/today"
+        "http://localhost:5000/api/sensor/aggregate/today",
+        { headers }
       );
+
+      // PERBAIKAN: Handle response errors
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          console.warn("⚠️ Unauthorized access to aggregate data");
+          handleMessage(
+            "Unauthorized - Please login to view aggregate data",
+            "warning"
+          );
+          setAggregateData([]);
+          return;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const result = await response.json();
 
       if (result.success && result.data && result.data.aggregates) {
         const aggregates = result.data.aggregates;
         setAggregateData(aggregates);
+
         if (aggregates.length > 0) {
           const allMeans = aggregates.map((a) => a.meanTemp);
           const allMins = aggregates.map((a) => a.minTemp);
@@ -150,19 +269,47 @@ const TemperatureAggregateDashboard = () => {
     } catch (error) {
       console.error("❌ Error fetching aggregate data:", error);
       setAggregateData([]);
-      handleMessage("Gagal memuat data agregat.", "error");
+      handleMessage(`Gagal memuat data agregat: ${error.message}`, "error");
     }
   };
 
   const fetchSystemStatus = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/system/status");
-      const result = await response.json();
-      if (result.success) {
-        setSystemStatus(result.data);
+      // PERBAIKAN: Tambahkan authentication header
+      const headers = {
+        "Content-Type": "application/json",
+      };
+
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const response = await fetch("http://localhost:5000/api/system/status", {
+        headers,
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setSystemStatus(result.data);
+        }
+      } else if (response.status === 401 || response.status === 403) {
+        console.warn("⚠️ Unauthorized access to system status");
+        // Set default system status untuk guest
+        setSystemStatus({
+          databaseBuffer: 0,
+          pendingAggregates: 0,
+          processedBuffer: 0,
+        });
       }
     } catch (error) {
       console.error("❌ Error fetching system status:", error);
+      // PERBAIKAN: Set default system status jika error
+      setSystemStatus({
+        databaseBuffer: 0,
+        pendingAggregates: 0,
+        processedBuffer: 0,
+      });
     }
   };
 
@@ -270,6 +417,7 @@ const TemperatureAggregateDashboard = () => {
     }
   };
 
+  // PERBAIKAN: Update useEffect untuk depend on token
   useEffect(() => {
     const initializeData = async () => {
       setIsLoading(true);
@@ -277,19 +425,24 @@ const TemperatureAggregateDashboard = () => {
       setIsLoading(false);
     };
 
-    initializeData();
-    intervalRef.current = setInterval(() => {
-      fetchAggregateData();
-      fetchSystemStatus();
-    }, 10 * 60 * 1000);
+    // Hanya fetch jika token sudah tersedia (bisa null atau string)
+    if (token !== undefined) {
+      initializeData();
 
-    exportCheckRef.current = setInterval(checkAutoExport, 60 * 1000);
+      // PERBAIKAN: Set interval dengan cleanup yang proper
+      intervalRef.current = setInterval(() => {
+        fetchAggregateData();
+        fetchSystemStatus();
+      }, 10 * 60 * 1000); // 10 menit
+
+      exportCheckRef.current = setInterval(checkAutoExport, 60 * 1000); // 1 menit
+    }
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (exportCheckRef.current) clearInterval(exportCheckRef.current);
     };
-  }, []);
+  }, [token]); // PERBAIKAN: Depend on token
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
@@ -306,6 +459,8 @@ const TemperatureAggregateDashboard = () => {
             <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mb-4">
               Data agregasi suhu dari Prisma Database • Interval 10 menit •
               Auto-export harian
+              {/* PERBAIKAN: Tampilkan status authentication */}
+              {token ? " • 🔐 Authenticated" : " • 🔓 Guest Mode"}
             </p>
           </div>
 
