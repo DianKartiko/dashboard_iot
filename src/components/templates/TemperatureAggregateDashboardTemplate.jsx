@@ -1,27 +1,64 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Database, TrendingUp, Clock, Calendar } from "lucide-react";
+import { Database, TrendingUp, Clock, Calendar, Sun, Moon } from "lucide-react";
 import StatsCard from "../molecules/StatsCard";
 import ExportControls from "../molecules/ExportControls";
 import TemperatureAggregateTable from "../organism/TemperatureAggregateTable";
+import ButtonData from "../atoms/ButtonData";
 
-// MessageModal Component (Missing component)
+// // Dark Mode Toggle Component
+// const DarkModeToggle = ({ darkMode, setDarkMode }) => {
+//   return (
+//     <ButtonData
+//       variant="outline"
+//       size="sm"
+//       onClick={() => setDarkMode(!darkMode)}
+//       icon={darkMode ? Sun : Moon}
+//       className="fixed top-4 right-4 z-50 shadow-lg"
+//     >
+//       <span className="hidden sm:inline">
+//         {darkMode ? "Light" : "Dark"} Mode
+//       </span>
+//     </ButtonData>
+//   );
+// };
+
+// MessageModal Component
 const MessageModal = ({ message, type, onClose }) => {
   const bgColor = {
-    info: "bg-blue-50 border-blue-200 text-blue-800",
-    error: "bg-red-50 border-red-200 text-red-800",
-    success: "bg-green-50 border-green-200 text-green-800",
-    warning: "bg-yellow-50 border-yellow-200 text-yellow-800",
+    info: "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200",
+    error:
+      "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200",
+    success:
+      "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200",
+    warning:
+      "bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-200",
   };
 
   return (
-    <div className={`p-4 rounded-lg border mb-4 ${bgColor[type] || bgColor.info}`}>
-      <div className="flex justify-between items-center">
-        <p className="text-sm font-medium">{message}</p>
+    <div
+      className={`p-3 sm:p-4 rounded-lg border mb-4 shadow-sm ${
+        bgColor[type] || bgColor.info
+      }`}
+    >
+      <div className="flex justify-between items-start gap-3">
+        <p className="text-sm font-medium flex-1">{message}</p>
         <button
           onClick={onClose}
-          className="ml-4 text-gray-400 hover:text-gray-600"
+          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1"
         >
-          ×
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
         </button>
       </div>
     </div>
@@ -34,6 +71,7 @@ const TemperatureAggregateDashboard = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [lastExport, setLastExport] = useState(null);
   const [systemStatus, setSystemStatus] = useState(null);
+  // const [darkMode, setDarkMode] = useState(false);
   const [stats, setStats] = useState({
     totalRecords: 0,
     avgTemp: 0,
@@ -46,6 +84,26 @@ const TemperatureAggregateDashboard = () => {
 
   const intervalRef = useRef();
   const exportCheckRef = useRef();
+
+  // Dark mode effect
+  // useEffect(() => {
+  //   if (darkMode) {
+  //     document.documentElement.classList.add("dark");
+  //   } else {
+  //     document.documentElement.classList.remove("dark");
+  //   }
+  // }, [darkMode]);
+
+  // Initialize dark mode from system preference
+  // useEffect(() => {
+  //   const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  //   setDarkMode(mediaQuery.matches);
+
+  //   const handleChange = (e) => setDarkMode(e.matches);
+  //   mediaQuery.addEventListener("change", handleChange);
+
+  //   return () => mediaQuery.removeEventListener("change", handleChange);
+  // }, []);
 
   const handleMessage = (msg, type = "info") => {
     setMessage({ text: msg, type });
@@ -120,7 +178,7 @@ const TemperatureAggregateDashboard = () => {
         "ID",
         "Date",
         "Time Slot",
-        "Mean Temperature (°C)",
+        "Rata-Rata Temperature (°C)",
         "Min Temperature (°C)",
         "Max Temperature (°C)",
         "Sample Count",
@@ -152,7 +210,7 @@ const TemperatureAggregateDashboard = () => {
       link.download = fileName;
       link.click();
       setLastExport(new Date().toISOString());
-      handleMessage("Ekspor CSV berhasil!", "info");
+      handleMessage("Ekspor CSV berhasil!", "success");
     } catch (error) {
       console.error("❌ Error exporting CSV:", error);
       handleMessage("Terjadi kesalahan saat mengekspor CSV.", "error");
@@ -190,7 +248,7 @@ const TemperatureAggregateDashboard = () => {
       link.download = fileName;
       link.click();
       setLastExport(new Date().toISOString());
-      handleMessage("Ekspor Excel/JSON berhasil!", "info");
+      handleMessage("Ekspor Excel/JSON berhasil!", "success");
     } catch (error) {
       console.error("❌ Error exporting Excel:", error);
       handleMessage("Terjadi kesalahan saat mengekspor Excel/JSON.", "error");
@@ -234,39 +292,78 @@ const TemperatureAggregateDashboard = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-800">
-      <div className="container mx-auto p-4 my-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+      {/* Dark Mode Toggle */}
+      {/* <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} /> */}
+
+      <div className="container mx-auto p-3 sm:p-4 lg:p-6 pt-4 sm:pt-4 my-4 rounded-lg">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-            Temperature Aggregate Report
-          </h1>
-          <p className="text-gray-600 mt-2 dark:text-gray-300">
-            Data agregasi suhu dari Prisma Database • Interval 10 menit •
-            Auto-export harian
-          </p>
+        <div className="mb-6 sm:mb-8">
+          <div className="text-start sm:text-left">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+              Temperature Aggregate Report
+            </h1>
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mb-4">
+              Data agregasi suhu dari Prisma Database • Interval 10 menit •
+              Auto-export harian
+            </p>
+          </div>
+
           {systemStatus && (
-            <div className="mt-2 flex items-center gap-4 text-sm">
-              <span className="flex items-center gap-1">
-                <div
-                  className={`w-2 h-2 rounded-full ${
-                    systemStatus.databaseBuffer > 0
-                      ? "bg-green-500"
-                      : "bg-gray-400"
-                  }`}
-                ></div>
-                DB Buffer: {systemStatus.databaseBuffer}
-              </span>
-              <span className="flex items-center gap-1">
-                <div
-                  className={`w-2 h-2 rounded-full ${
-                    systemStatus.pendingAggregates > 0
-                      ? "bg-yellow-500"
-                      : "bg-green-500"
-                  }`}
-                ></div>
-                Pending Aggregates: {systemStatus.pendingAggregates}
-              </span>
+            <div className="mt-4 p-3 sm:p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+                System Status
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-3 text-xs sm:text-sm">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      systemStatus.databaseBuffer > 0
+                        ? "bg-green-500"
+                        : "bg-gray-400"
+                    }`}
+                  ></div>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    DB Buffer:{" "}
+                    <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
+                      {systemStatus.databaseBuffer}
+                    </span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      systemStatus.pendingAggregates > 0
+                        ? "bg-yellow-500"
+                        : "bg-green-500"
+                    }`}
+                  ></div>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Pending:{" "}
+                    <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
+                      {systemStatus.pendingAggregates}
+                    </span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Records:{" "}
+                    <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
+                      {aggregateData.length}
+                    </span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Ready:{" "}
+                    <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
+                      {stats.aggregatesReady}
+                    </span>
+                  </span>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -278,33 +375,6 @@ const TemperatureAggregateDashboard = () => {
             onClose={() => setMessage(null)}
           />
         )}
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatsCard
-            title="Aggregate Records"
-            value={stats.totalRecords}
-            icon={Database}
-          />
-          <StatsCard
-            title="Average Temperature"
-            value={`${stats.avgTemp.toFixed(1)}°C`}
-            icon={TrendingUp}
-            trend={stats.trend.toFixed(1)}
-          />
-          <StatsCard
-            title="Temperature Range"
-            value={`${stats.minTemp.toFixed(1)} - ${stats.maxTemp.toFixed(
-              1
-            )}°C`}
-            icon={Clock}
-          />
-          <StatsCard
-            title="Ready for Export"
-            value={stats.aggregatesReady}
-            icon={Calendar}
-          />
-        </div>
 
         {/* Export Controls */}
         <div className="mb-6">
@@ -326,80 +396,108 @@ const TemperatureAggregateDashboard = () => {
         />
 
         {/* System Info Footer */}
-        <div className="mt-8 bg-white rounded-lg border border-gray-200 p-6">
-          <h4 className="text-lg font-medium text-gray-900 mb-4">
+        <div className="mt-6 sm:mt-8 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6 shadow-sm">
+          <h4 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
             System Information
           </h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {/* Database Status */}
-            <div className="space-y-2">
-              <h5 className="text-sm font-medium text-gray-700">
+            <div className="space-y-3">
+              <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-600 pb-2">
                 Database Status
               </h5>
-              <div className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Buffer Records:</span>
-                  <span className="font-mono">
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs sm:text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Buffer Records:
+                  </span>
+                  <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
                     {systemStatus?.databaseBuffer || 0}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Processed Buffer:</span>
-                  <span className="font-mono">
+                <div className="flex justify-between text-xs sm:text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Processed Buffer:
+                  </span>
+                  <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
                     {systemStatus?.processedBuffer || 0}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Aggregate Records:</span>
-                  <span className="font-mono">{aggregateData.length}</span>
+                <div className="flex justify-between text-xs sm:text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Aggregate Records:
+                  </span>
+                  <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
+                    {aggregateData.length}
+                  </span>
                 </div>
               </div>
             </div>
 
             {/* Export Status */}
-            <div className="space-y-2">
-              <h5 className="text-sm font-medium text-gray-700">
+            <div className="space-y-3">
+              <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-600 pb-2">
                 Export Status
               </h5>
-              <div className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Ready for Export:</span>
-                  <span className="font-mono text-yellow-600">
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs sm:text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Ready for Export:
+                  </span>
+                  <span className="font-mono font-medium text-yellow-600 dark:text-yellow-400">
                     {stats.aggregatesReady}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Last Export:</span>
-                  <span className="font-mono text-xs">
+                <div className="flex justify-between text-xs sm:text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Last Export:
+                  </span>
+                  <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
                     {lastExport
                       ? new Date(lastExport).toLocaleString("id-ID")
                       : "Never"}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Next Auto Export:</span>
-                  <span className="font-mono text-xs">Daily at 00:01</span>
+                <div className="flex justify-between text-xs sm:text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Next Auto Export:
+                  </span>
+                  <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
+                    Daily at 00:01
+                  </span>
                 </div>
               </div>
             </div>
 
             {/* Data Collection Info */}
-            <div className="space-y-2">
-              <h5 className="text-sm font-medium text-gray-700">
+            <div className="space-y-3 md:col-span-2 lg:col-span-1">
+              <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-600 pb-2">
                 Data Collection
               </h5>
-              <div className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Collection Interval:</span>
-                  <span className="font-mono">10 minutes</span>
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs sm:text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Collection Interval:
+                  </span>
+                  <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
+                    10 minutes
+                  </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Aggregation Method:</span>
-                  <span className="font-mono">Mean, Median, Mode</span>
+                <div className="flex justify-between text-xs sm:text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Aggregation Method:
+                  </span>
+                  <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
+                    Mean, Median, Mode
+                  </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Data Retention:</span>
-                  <span className="font-mono">Until exported</span>
+                <div className="flex justify-between text-xs sm:text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Data Retention:
+                  </span>
+                  <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
+                    Until exported
+                  </span>
                 </div>
               </div>
             </div>

@@ -3,10 +3,9 @@ import Charts from "../molecules/Charts";
 import Dryers from "../molecules/Dryers";
 import Sidebar from "../molecules/Sidebar";
 import Footer from "../atoms/Footer";
-import TemperatureAggregateDashboard from "./TemperatureAggregateDashboardTemplate";
 import TemperatureAggregatePage from "../pages/TemperatureAggregatePage";
 
-export default function MainTemplates() {
+export default function DataTemplates() {
   return (
     <>
       {/* Sidebar */}
@@ -16,8 +15,10 @@ export default function MainTemplates() {
       <div className="flex-1 p-4 sm:ml-64">
         <Title title={"Dashboard Anlitik Report"} />
 
-        <TemperatureAggregatePage/>
+        <TemperatureAggregatePage />
       </div>
+
+      {/* Footer */}
     </>
   );
 }
