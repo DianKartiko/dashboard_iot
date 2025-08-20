@@ -477,7 +477,7 @@ export default function Charts() {
                   stroke="#3b82f6"
                   strokeWidth={3}
                   fill="url(#tempGradient)"
-                  dot={{ r: 4, fill: "#3b82f6" }}
+                  dot={{ r: 3, fill: "#3b82f6" }}
                   activeDot={{ r: 6, fill: "#1d4ed8" }}
                 />
               </AreaChart>

@@ -1,115 +1,162 @@
-import { useState, useRef, useEffect } from "react";
-import ButtonMobile from "../atoms/ButtonMobile";
-import NavLinkItem from "../atoms/NavLinks";
+// src/components/molecules/Sidebar.jsx
+import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function Sidebar() {
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const sidebarRef = useRef(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const location = useLocation();
+  const { user, logout } = useAuth();
 
-    const toggleSidebar = () => {
-        setIsSidebarOpen(!isSidebarOpen);
-    };
+  const handleLogout = () => {
+    if (window.confirm("Apakah Anda yakin ingin keluar?")) {
+      logout();
+    }
+  };
 
-    const closeSidebar = () => {
-        setIsSidebarOpen(false);
-    };
+  const menuItems = [
+    {
+      path: "/",
+      icon: (
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"></path>
+        </svg>
+      ),
+      label: "Dashboard",
+    },
+    {
+      path: "/data",
+      icon: (
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"></path>
+        </svg>
+      ),
+      label: "Data Analitik",
+    },
+  ];
 
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (
-                sidebarRef.current &&
-                !sidebarRef.current.contains(event.target)
-            ) {
-                setIsSidebarOpen(false);
-            }
-        };
+  return (
+    <>
+      {/* Mobile menu button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        type="button"
+        className="inline-flex items-center p-2 mt-2 ml-3 text-sm text-gray-500 rounded-lg sm:hidden hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600"
+      >
+        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+          <path
+            fillRule="evenodd"
+            d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
+            clipRule="evenodd"
+          ></path>
+        </svg>
+      </button>
 
-        if (isSidebarOpen) {
-            document.addEventListener("mousedown", handleClickOutside);
-        }
-
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-        };
-    }, [isSidebarOpen]);
-
-    const navItems = [
-        {
-            name: "Dashboard",
-            path: "/",
-            icon: (
-                <svg
-                    className="w-5 h-5"
-                    aria-hidden="true"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="currentColor"
-                    viewBox="0 0 22 21"
-                >
-                    <path d="M16.975 11H10V4.025a1 1 0 0 0-1.066-.998 8.5 8.5 0 1 0 9.039 9.039.999.999 0 0 0-1-1.066h.002Z" />
-                    <path d="M12.5 0c-.157 0-.311.01-.565.027A1 1 0 0 0 11 1.02V10h8.975a1 1 0 0 0 1-.935c.013-.188.028-.374.028-.565A8.51 8.51 0 0 0 12.5 0Z" />
-                </svg>
-            ),
-        },
-        {
-            name: "Data",
-            path: "/data",
-            icon: (
-                <svg
-                    className="w-5 h-5"
-                    aria-hidden="true"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        fillRule="evenodd"
-                        d="M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Zm4.996 2a1 1 0 0 0 0 2h.01a1 1 0 1 0 0-2h-.01ZM11 8a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-6Zm-4.004 3a1 1 0 1 0 0 2h.01a1 1 0 1 0 0-2h-.01ZM11 11a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-6Zm-4.004 3a1 1 0 1 0 0 2h.01a1 1 0 1 0 0-2h-.01ZM11 14a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-6Z"
-                        clipRule="evenodd"
-                    />
-                </svg>
-            ),
-        },
-        {
-            name: "Notifications",
-            path: "/notifications",
-            icon: (
-                <svg
-                    className="w-5 h-5"
-                    aria-hidden="true"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path d="M17.133 12.632v-1.8a5.406 5.406 0 0 0-4.154-5.262.955.955 0 0 0 .021-.106V3.1a1 1 0 0 0-2 0v2.364a.955.955 0 0 0 .021.106 5.406 5.406 0 0 0-4.154 5.262v1.8C6.867 15.018 5 15.614 5 16.807 5 17.4 5 18 5.538 18h12.924C19 18 19 17.4 19 16.807c0-1.193-1.867-1.789-1.867-4.175ZM8.823 19a3.453 3.453 0 0 0 6.354 0H8.823Z" />
-                </svg>
-            ),
-        },
-    ];
-
-    return (
-        <>
-            <ButtonMobile toggleSidebar={toggleSidebar} />
-
-            <aside
-                ref={sidebarRef}
-                id="default-sidebar"
-                className={`fixed top-0 left-0 z-40 w-64 h-screen transition-transform -translate-x-full sm:translate-x-0 ${
-                    isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-                }`}
-                aria-label="Sidebar"
+      {/* Sidebar */}
+      <aside
+        className={`fixed top-0 left-0 z-40 w-64 h-screen transition-transform ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        } sm:translate-x-0 bg-white border-r border-gray-200 dark:bg-gray-800 dark:border-gray-700`}
+      >
+        <div className="h-full px-3 py-4 overflow-y-auto">
+          {/* Logo/Header */}
+          <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                IoT Dashboard
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Monitoring System
+              </p>
+            </div>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="sm:hidden p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             >
-                <div className="h-full px-3 py-4 overflow-y-auto bg-gray-50 dark:bg-gray-800">
-                    <ul className="space-y-2 font-medium">
-                        {navItems.map((item) => (
-                            <NavLinkItem
-                                key={item.path}
-                                item={item}
-                                closeSidebar={closeSidebar}
-                            />
-                        ))}
-                    </ul>
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                ></path>
+              </svg>
+            </button>
+          </div>
+
+          {/* User Info */}
+          {user && (
+            <div className="flex items-center mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                  {user.username.charAt(0).toUpperCase()}
                 </div>
-            </aside>
-        </>
-    );
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {user.username}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Administrator
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Navigation Menu */}
+          <ul className="space-y-2 font-medium">
+            {menuItems.map((item) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <li key={item.path}>
+                  <Link
+                    to={item.path}
+                    className={`flex items-center p-3 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 ${
+                      isActive
+                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                        : ""
+                    }`}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <span
+                      className={`${
+                        isActive ? "text-blue-700 dark:text-blue-300" : ""
+                      }`}
+                    >
+                      {item.icon}
+                    </span>
+                    <span className="ml-3">{item.label}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Logout Button */}
+          <div className="absolute bottom-4 left-3 right-3">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center p-3 text-gray-900 rounded-lg dark:text-white hover:bg-red-100 dark:hover:bg-red-900/20 hover:text-red-700 dark:hover:text-red-300 transition-colors duration-200"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z"
+                  clipRule="evenodd"
+                ></path>
+              </svg>
+              <span className="ml-3">Keluar</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-gray-900 bg-opacity-50 sm:hidden"
+          onClick={() => setIsOpen(false)}
+        ></div>
+      )}
+    </>
+  );
 }
