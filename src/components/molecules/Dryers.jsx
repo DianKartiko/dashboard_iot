@@ -1,34 +1,74 @@
 import Subtitle from "../atoms/Subtitle";
 import React, { useEffect, useState } from "react";
-import { useAuth } from "../contexts/AuthContext"; // Import useAuth
+import { useAuth } from "../contexts/AuthContext";
 
 export default function Dryers() {
-  // PERBAIKAN: Ambil token dari AuthContext
   const { token } = useAuth();
 
-  // State untuk menyimpan data suhu dari 3 dryers
   const [dryersData, setDryersData] = useState({
     dryer1: 0,
     dryer2: 0,
     dryer3: 0,
   });
 
-  // State untuk loading dan error
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
 
-  // PERBAIKAN: Fetch data dengan proper authentication
   const fetchDryersData = async () => {
     try {
-      // Reset error state
       setError(null);
 
-      // Coba endpoint protected terlebih dahulu jika ada token
       if (token) {
         try {
-          // PERBAIKAN: Coba ambil data current dari API protected
+          // PERBAIKAN: Gunakan endpoint yang benar /api/sensor/suhu
+          const response = await fetch(
+            "http://localhost:5000/api/sensor/suhu",
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          if (response.ok) {
+            const result = await response.json();
+            console.log("✅ Sensor suhu data:", result);
+
+            if (result.success && result.suhu !== undefined) {
+              // PERBAIKAN: Gunakan data suhu dari response
+              const currentTemp = parseFloat(result.suhu);
+
+              setDryersData({
+                dryer1: currentTemp,
+                dryer2: Math.max(0, currentTemp + (Math.random() - 0.5) * 4),
+                dryer3: Math.max(0, currentTemp + (Math.random() - 0.5) * 4),
+              });
+
+              setIsConnected(!result.usingSimulation);
+              setLastUpdate(new Date());
+              setLoading(false);
+
+              if (result.usingSimulation) {
+                setError("Using simulation data - check ESP32 connection");
+              }
+
+              console.log("✅ Dryers data updated from sensor/suhu endpoint");
+              return;
+            }
+          } else if (response.status === 401 || response.status === 403) {
+            console.warn(
+              "⚠️ Sensor/suhu endpoint unauthorized, trying current"
+            );
+          }
+        } catch (suhuError) {
+          console.warn("⚠️ Sensor/suhu endpoint failed:", suhuError.message);
+        }
+
+        // PERBAIKAN: Fallback ke /api/sensor/current
+        try {
           const response = await fetch(
             "http://localhost:5000/api/sensor/current",
             {
@@ -41,69 +81,51 @@ export default function Dryers() {
 
           if (response.ok) {
             const result = await response.json();
-            console.log("✅ Protected sensor data:", result);
+            console.log("✅ Sensor current data:", result);
 
             if (result.success && result.data) {
-              const currentTemp = parseFloat(result.data.temperature);
-
-              // PERBAIKAN: Simulasi data untuk 3 dryers berdasarkan sensor utama
-              setDryersData({
-                dryer1: currentTemp,
-                dryer2: Math.max(0, currentTemp + (Math.random() - 0.5) * 5), // Variasi ±2.5°C
-                dryer3: Math.max(0, currentTemp + (Math.random() - 0.5) * 5), // Variasi ±2.5°C
-              });
-
-              setIsConnected(true);
-              setLastUpdate(new Date());
-              setLoading(false);
-              console.log("✅ Dryers data updated from protected endpoint");
-              return;
+              // Process data dari /current endpoint
+              const latestData = result.data[1]; // Ambil data dryer pertama
+              if (latestData) {
+                setDryersData({
+                  dryer1: latestData.suhu || 0,
+                  dryer2: Math.max(
+                    0,
+                    (latestData.suhu || 0) + (Math.random() - 0.5) * 4
+                  ),
+                  dryer3: Math.max(
+                    0,
+                    (latestData.suhu || 0) + (Math.random() - 0.5) * 4
+                  ),
+                });
+                setIsConnected(!result.usingSimulation);
+                setLastUpdate(new Date());
+                setLoading(false);
+                console.log(
+                  "✅ Dryers data updated from sensor/current endpoint"
+                );
+                return;
+              }
             }
-          } else if (response.status === 401 || response.status === 403) {
-            console.warn("⚠️ Protected endpoint unauthorized, trying fallback");
           }
-        } catch (protectedError) {
-          console.warn("⚠️ Protected endpoint failed:", protectedError.message);
+        } catch (currentError) {
+          console.warn(
+            "⚠️ Sensor/current endpoint failed:",
+            currentError.message
+          );
         }
       }
 
-      // PERBAIKAN: Fallback ke endpoint lama (tidak protected)
-      const fallbackResponse = await fetch("http://localhost:5000/api/suhu");
-
-      if (!fallbackResponse.ok) {
-        throw new Error(`Fallback API error: ${fallbackResponse.status}`);
-      }
-
-      const fallbackData = await fallbackResponse.json();
-      console.log("✅ Fallback sensor data:", fallbackData);
-
-      if (fallbackData.suhu !== undefined) {
-        const currentTemp = parseFloat(fallbackData.suhu);
-
-        // PERBAIKAN: Simulasi data untuk 3 dryers
-        setDryersData({
-          dryer1: currentTemp,
-          dryer2: Math.max(0, currentTemp + (Math.random() - 0.5) * 4),
-          dryer3: Math.max(0, currentTemp + (Math.random() - 0.5) * 4),
-        });
-
-        setIsConnected(true);
-        setLastUpdate(new Date());
-        setError(
-          token ? "Using fallback endpoint - check database connection" : null
-        );
-        console.log("✅ Dryers data updated from fallback endpoint");
-      } else {
-        throw new Error("Invalid data format from fallback API");
-      }
+      // PERBAIKAN: HAPUS fallback ke /api/suhu karena sudah dipindah ke /api/sensor/suhu
+      throw new Error("All sensor endpoints failed");
     } catch (err) {
       console.error("❌ Error fetching dryers data:", err);
       setError(`Failed to fetch data: ${err.message}`);
       setIsConnected(false);
 
-      // PERBAIKAN: Generate dummy data jika semua endpoint gagal
+      // Generate dummy data jika semua endpoint gagal
       setDryersData({
-        dryer1: 25 + Math.random() * 10, // 25-35°C
+        dryer1: 25 + Math.random() * 10,
         dryer2: 25 + Math.random() * 10,
         dryer3: 25 + Math.random() * 10,
       });
@@ -112,33 +134,27 @@ export default function Dryers() {
     }
   };
 
-  // PERBAIKAN: Initial fetch dengan proper dependency
   useEffect(() => {
-    // Hanya fetch jika component sudah mount dan token sudah tersedia
     if (token !== undefined) {
-      // token bisa null atau string
       fetchDryersData();
     }
-  }, [token]); // Depend on token
+  }, [token]);
 
-  // PERBAIKAN: Auto-refresh dengan proper cleanup
   useEffect(() => {
-    // Tidak ada interval jika masih loading atau tidak ada koneksi
     if (loading) return;
 
     const interval = setInterval(() => {
       console.log("🔄 Refreshing dryers data...");
       fetchDryersData();
-    }, 2000); // 2 detik
+    }, 5000); // PERBAIKAN: Ubah ke 5 detik untuk mengurangi load
 
     return () => clearInterval(interval);
-  }, [token, loading]); // Depend on token dan loading state
+  }, [token, loading]);
 
-  // PERBAIKAN: Update stats dengan data real
   const stats = [
     {
       title: "Oli Dryer 1",
-      count: Math.round(dryersData.dryer1 * 100) / 100, // Round to 1 decimal
+      count: Math.round(dryersData.dryer1 * 100) / 100,
       icon: (
         <svg
           className="w-6 h-6 text-amber-500"
@@ -172,7 +188,7 @@ export default function Dryers() {
         </svg>
       ),
       bg: "bg-pink-200",
-      iconBg: "bg-pink-300 text-pink-300",
+      iconBg: "bg-pink-300 text-pink-600", // PERBAIKAN: Fix color
     },
     {
       title: "Oli Dryer 3",
@@ -191,11 +207,10 @@ export default function Dryers() {
         </svg>
       ),
       bg: "bg-sky-200",
-      iconBg: "bg-sky-300 text-sky-300",
+      iconBg: "bg-sky-300 text-sky-600", // PERBAIKAN: Fix color
     },
   ];
 
-  // PERBAIKAN: Loading state
   if (loading) {
     return (
       <div className="bg-grey-50 dark:bg-gray-800 rounded-lg p-4 my-4 w-full">
@@ -224,6 +239,7 @@ export default function Dryers() {
   return (
     <div className="bg-grey-50 dark:bg-gray-800 rounded-lg p-4 my-4 w-full">
       <Subtitle title="Summary" />
+      {error && <p className="text-red-500 mb-2">{error}</p>}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 my-4 md:grid-cols-2 lg:grid-cols-3">
         {stats.map((item, idx) => (
           <div
@@ -249,6 +265,13 @@ export default function Dryers() {
           </div>
         ))}
       </div>
+      {/* PERBAIKAN: Status indicator */}
+      {lastUpdate && (
+        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+          {isConnected ? "🟢 ESP32 Connected" : "⚠️ Using Simulation"} • Last
+          update: {lastUpdate.toLocaleTimeString()}
+        </div>
+      )}
     </div>
   );
 }
