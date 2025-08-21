@@ -12,7 +12,7 @@ export default function DataTemplates() {
       <Sidebar />
 
       {/* Main Content */}
-      <div className="flex-1 p-4 sm:ml-64">
+      <div className="flex-1 p-4 sm:ml-64 dark:bg-gray-950 bg-gray-50">
         <Title title={"Dashboard Anlitik Report"} />
 
         <TemperatureAggregatePage />
