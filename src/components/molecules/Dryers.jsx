@@ -1,7 +1,6 @@
-import Subtitle from "../atoms/Subtitle";
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
-
+import Subtitle from "../atoms/Subtitle";
 export default function Dryers() {
   const { token } = useAuth();
 
@@ -24,7 +23,7 @@ export default function Dryers() {
         try {
           // PERBAIKAN: Gunakan endpoint yang benar /api/sensor/suhu
           const response = await fetch(
-            "http://localhost:5000/api/sensor/suhu",
+            "http://localhost:3000/api/sensor/suhu",
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -70,7 +69,7 @@ export default function Dryers() {
         // PERBAIKAN: Fallback ke /api/sensor/current
         try {
           const response = await fetch(
-            "http://localhost:5000/api/sensor/current",
+            "http://localhost:3000/api/sensor/current",
             {
               headers: {
                 Authorization: `Bearer ${token}`,
