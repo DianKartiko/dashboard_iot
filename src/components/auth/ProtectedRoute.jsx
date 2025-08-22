@@ -29,18 +29,8 @@ const ProtectedRoute = ({
 
   // PERBAIKAN: Show auth error if exists
   if (error && !isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center max-w-md">
-          <div className="text-red-500 text-4xl mb-4">🔒</div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
-            Authentication Error
-          </h2>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <Navigate to="/login" state={{ from: location, error }} replace />
-        </div>
-      </div>
-    );
+    console.log("ProtectedRoute: Auth error, redirecting to login");
+    return <Navigate to="/login" state={{ from: location, error }} replace />;
   }
 
   // PERBAIKAN: Redirect to login if not authenticated
@@ -50,7 +40,7 @@ const ProtectedRoute = ({
   }
 
   // PERBAIKAN: Check admin requirement
-  if (requireAdmin && user?.role !== "admin") {
+  if (requireAdmin && user?.role !== "admin" && !user?.isDefaultAdmin) {
     console.log("ProtectedRoute: Admin access required but user is not admin");
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -69,7 +59,12 @@ const ProtectedRoute = ({
             >
               Go Back
             </button>
-            <Navigate to="/dashboard" replace />
+            <button
+              onClick={() => (window.location.href = "/dashboard")}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            >
+              Dashboard
+            </button>
           </div>
         </div>
       </div>
@@ -92,7 +87,12 @@ const ProtectedRoute = ({
             Your current role ({user?.role}) doesn't have permission to access
             this page. Required role: {requireRole}
           </p>
-          <Navigate to="/dashboard" replace />
+          <button
+            onClick={() => (window.location.href = "/dashboard")}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          >
+            Go to Dashboard
+          </button>
         </div>
       </div>
     );

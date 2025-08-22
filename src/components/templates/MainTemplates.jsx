@@ -11,7 +11,7 @@ export default function MainTemplates() {
       <Sidebar />
 
       {/* Main Content */}
-      <div className="flex-1 p-4 sm:ml-64 dark:bg-gray-950 bg-gray-50">
+      <div className="flex-1 p-4 sm:ml-64 dark:bg-gray-950 bg-gray-50 min-h-screen">
         <Title title={"Dashboard Statistic"} />
         {/* Dryers */}
         <Dryers />

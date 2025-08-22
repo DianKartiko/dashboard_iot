@@ -47,10 +47,14 @@ const LoginPage = () => {
     setError("");
 
     try {
-      const result = await login(formData.username, formData.password);
+      const result = await login(formData);
 
       if (result.success) {
         navigate("/dashboard", { replace: true });
+      } else {
+        setError(
+          result.error || "Login failed. Please check your credentials."
+        );
       }
     } catch (error) {
       setError(error.message || "Login failed. Please check your credentials.");

@@ -11,6 +11,9 @@ const MainTemplates = React.lazy(() =>
   import("./components/templates/MainTemplates")
 );
 const DataTemplate = React.lazy(() => import("./components/templates/Data"));
+const TemperatureAggregateDashboardTemplateNew = React.lazy(() =>
+  import("./components/templates/TemperatureAggregateDashboardTemplate")
+);
 
 // PERBAIKAN: Loading component
 const LoadingSpinner = () => (
@@ -87,6 +90,15 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <DataTemplate />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/temperature-dashboard"
+                element={
+                  <ProtectedRoute>
+                    <TemperatureAggregateDashboardTemplateNew />
                   </ProtectedRoute>
                 }
               />

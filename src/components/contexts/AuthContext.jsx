@@ -1,331 +1,237 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useReducer, useEffect } from "react";
+import apiClient from "../../utils/apiClient";
 
+// Auth Context
 const AuthContext = createContext();
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
+// Initial state
+const initialState = {
+  isAuthenticated: false,
+  user: null,
+  token: null,
+  loading: true,
+  error: null,
 };
 
+// Auth reducer
+const authReducer = (state, action) => {
+  switch (action.type) {
+    case "SET_LOADING":
+      return { ...state, loading: action.payload };
+
+    case "LOGIN_SUCCESS":
+      return {
+        ...state,
+        isAuthenticated: true,
+        user: action.payload.user,
+        token: action.payload.token,
+        loading: false,
+        error: null,
+      };
+
+    case "LOGIN_FAILURE":
+      return {
+        ...state,
+        isAuthenticated: false,
+        user: null,
+        token: null,
+        loading: false,
+        error: action.payload,
+      };
+
+    case "LOGOUT":
+      return {
+        ...initialState,
+        loading: false,
+      };
+
+    case "SET_ERROR":
+      return {
+        ...state,
+        error: action.payload,
+        loading: false,
+      };
+
+    case "CLEAR_ERROR":
+      return {
+        ...state,
+        error: null,
+      };
+
+    case "UPDATE_USER":
+      return {
+        ...state,
+        user: { ...state.user, ...action.payload },
+      };
+
+    default:
+      return state;
+  }
+};
+
+// Auth Provider Component
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // PERBAIKAN: Base API URL
-  const API_BASE_URL =
-    import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-
-  // PERBAIKAN: Initialize auth state from localStorage
+  // Check if user is authenticated on app load
   useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        const storedToken = localStorage.getItem("authToken");
-        const storedUser = localStorage.getItem("authUser");
+    checkAuthStatus();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-        if (storedToken && storedUser) {
-          setToken(storedToken);
-
-          try {
-            const parsedUser = JSON.parse(storedUser);
-            setUser(parsedUser);
-
-            // PERBAIKAN: Verify token masih valid
-            await verifyToken(storedToken);
-          } catch (parseError) {
-            console.warn("Invalid stored user data, clearing auth");
-            await logout();
-          }
-        }
-      } catch (error) {
-        console.error("Auth initialization error:", error);
-        await logout();
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeAuth();
-  }, []);
-
-  // PERBAIKAN: Verify token validity
-  const verifyToken = async (tokenToVerify = token) => {
+  const checkAuthStatus = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${tokenToVerify}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const token = localStorage.getItem("authToken");
 
-      if (!response.ok) {
-        throw new Error("Token verification failed");
+      if (!token) {
+        dispatch({ type: "SET_LOADING", payload: false });
+        return;
       }
 
-      const data = await response.json();
+      // Update apiClient token
+      apiClient.updateToken();
 
-      if (data.success) {
-        setUser(data.data.user);
-        return true;
+      // Verify token with backend
+      const response = await apiClient.getCurrentUser();
+
+      if (response.success && response.data?.user) {
+        dispatch({
+          type: "LOGIN_SUCCESS",
+          payload: {
+            user: response.data.user,
+            token: token,
+          },
+        });
       } else {
-        throw new Error("Invalid token response");
+        // Invalid token
+        localStorage.removeItem("authToken");
+        dispatch({ type: "LOGIN_FAILURE", payload: "Invalid session" });
       }
     } catch (error) {
-      console.error("Token verification failed:", error);
-      await logout();
-      return false;
+      console.error("Auth check failed:", error);
+      localStorage.removeItem("authToken");
+      dispatch({
+        type: "LOGIN_FAILURE",
+        payload: error.message || "Authentication check failed",
+      });
     }
   };
 
-  // PERBAIKAN: Login with hybrid auth support
-  const login = async (username, password) => {
+  const login = async (credentials) => {
     try {
-      setLoading(true);
-      setError(null);
+      dispatch({ type: "SET_LOADING", payload: true });
+      dispatch({ type: "CLEAR_ERROR" });
 
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, password }),
-      });
+      const response = await apiClient.login(
+        credentials.username,
+        credentials.password
+      );
 
-      const data = await response.json();
+      if (response.success && response.data?.token) {
+        const { token, user } = response.data;
 
-      if (!response.ok) {
-        throw new Error(data.message || "Login failed");
-      }
+        // Store token dengan key yang benar
+        localStorage.setItem("authToken", token);
 
-      if (data.success) {
-        const { token: newToken, user: newUser } = data.data;
+        // Update apiClient token
+        apiClient.updateToken();
 
-        // Store auth data
-        localStorage.setItem("authToken", newToken);
-        localStorage.setItem("authUser", JSON.stringify(newUser));
-
-        setToken(newToken);
-        setUser(newUser);
-
-        // PERBAIKAN: Log successful login dengan info default admin
-        console.log("Login successful:", {
-          username: newUser.username,
-          role: newUser.role,
-          isDefaultAdmin: newUser.isDefaultAdmin,
+        // Update state
+        dispatch({
+          type: "LOGIN_SUCCESS",
+          payload: { user, token },
         });
 
-        return {
-          success: true,
-          user: newUser,
-          isDefaultAdmin: newUser.isDefaultAdmin,
-        };
+        return { success: true, user };
       } else {
-        throw new Error(data.message || "Login failed");
+        throw new Error(response.error || "Login failed");
       }
     } catch (error) {
-      console.error("Login error:", error);
-      setError(error.message);
-      throw error;
-    } finally {
-      setLoading(false);
+      const errorMessage =
+        error.response?.data?.error || error.message || "Login failed";
+      dispatch({ type: "LOGIN_FAILURE", payload: errorMessage });
+      return { success: false, error: errorMessage };
     }
   };
 
-  // PERBAIKAN: Register function
-  const register = async (username, email, password) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Registration failed");
-      }
-
-      if (data.success) {
-        console.log("Registration successful:", data.data.user);
-        return {
-          success: true,
-          user: data.data.user,
-          message:
-            "Registration successful. Please login with your credentials.",
-        };
-      } else {
-        throw new Error(data.message || "Registration failed");
-      }
-    } catch (error) {
-      console.error("Registration error:", error);
-      setError(error.message);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // PERBAIKAN: Logout function
   const logout = async () => {
     try {
-      // PERBAIKAN: Call logout endpoint if token exists
-      if (token) {
-        try {
-          await fetch(`${API_BASE_URL}/auth/logout`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          });
-        } catch (logoutError) {
-          console.warn("Logout endpoint call failed:", logoutError);
-          // Continue with local logout anyway
-        }
-      }
-
-      // Clear local state
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("authUser");
-      setToken(null);
-      setUser(null);
-      setError(null);
-
-      console.log("Logout completed");
+      // Use apiClient logout method yang sudah handle semua
+      await apiClient.logout();
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error("Logout failed:", error);
+    } finally {
+      // Clear state
+      dispatch({ type: "LOGOUT" });
     }
   };
 
-  // PERBAIKAN: Get auth info
-  const getAuthInfo = async () => {
+  const register = async (username, email, password) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/info`);
-      const data = await response.json();
+      dispatch({ type: "SET_LOADING", payload: true });
+      dispatch({ type: "CLEAR_ERROR" });
 
-      if (data.success) {
-        return data.data;
-      }
+      const response = await apiClient.register(username, email, password);
 
-      return null;
-    } catch (error) {
-      console.error("Failed to get auth info:", error);
-      return null;
-    }
-  };
-
-  // PERBAIKAN: Check if user is admin
-  const isAdmin = () => {
-    return user?.role === "admin";
-  };
-
-  // PERBAIKAN: Check if user is default admin
-  const isDefaultAdmin = () => {
-    return user?.isDefaultAdmin === true;
-  };
-
-  // PERBAIKAN: Get users (admin only)
-  const getUsers = async () => {
-    try {
-      if (!isAdmin()) {
-        throw new Error("Admin privileges required");
-      }
-
-      const response = await fetch(`${API_BASE_URL}/auth/users`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        return data.data.users;
+      if (response.success) {
+        dispatch({ type: "SET_LOADING", payload: false });
+        return { success: true, message: response.message };
       } else {
-        throw new Error(data.message || "Failed to get users");
+        throw new Error(response.error || "Registration failed");
       }
     } catch (error) {
-      console.error("Get users error:", error);
-      throw error;
+      const errorMessage =
+        error.response?.data?.error || error.message || "Registration failed";
+      dispatch({ type: "SET_ERROR", payload: errorMessage });
+      return { success: false, error: errorMessage };
     }
   };
 
-  // PERBAIKAN: Authenticated API request helper
-  const authenticatedRequest = async (url, options = {}) => {
-    if (!token) {
-      throw new Error("No authentication token available");
-    }
-
-    const defaultHeaders = {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    };
-
-    const requestOptions = {
-      ...options,
-      headers: {
-        ...defaultHeaders,
-        ...options.headers,
-      },
-    };
-
-    try {
-      const response = await fetch(`${API_BASE_URL}${url}`, requestOptions);
-
-      // PERBAIKAN: Handle token expiry
-      if (response.status === 401) {
-        console.warn("Token expired or invalid, logging out");
-        await logout();
-        throw new Error("Authentication expired. Please login again.");
-      }
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || `Request failed: ${response.status}`);
-      }
-
-      return data;
-    } catch (error) {
-      if (error.message.includes("Authentication expired")) {
-        throw error;
-      }
-
-      console.error("Authenticated request failed:", error);
-      throw new Error(error.message || "Request failed");
-    }
+  const clearError = () => {
+    dispatch({ type: "CLEAR_ERROR" });
   };
 
-  // PERBAIKAN: Context value
+  const updateUser = (userData) => {
+    dispatch({ type: "UPDATE_USER", payload: userData });
+  };
+
+  // Helper functions for role checking
+  const isAdmin = () => {
+    return state.user?.role === "admin" || state.user?.isDefaultAdmin === true;
+  };
+
+  const hasRole = (requiredRole) => {
+    return state.user?.role === requiredRole;
+  };
+
   const value = {
-    user,
-    token,
-    loading,
-    error,
+    // State
+    ...state,
+
+    // Actions
     login,
-    register,
     logout,
-    verifyToken,
-    getAuthInfo,
+    register,
+    clearError,
+    updateUser,
+    checkAuthStatus,
+
+    // Helpers
     isAdmin,
-    isDefaultAdmin,
-    getUsers,
-    authenticatedRequest,
-    isAuthenticated: !!token && !!user,
+    hasRole,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export default AuthProvider;
+// Custom hook to use auth context
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+
+  return context;
+};
+
+export default AuthContext;
