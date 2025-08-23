@@ -21,53 +21,7 @@ export default function Dryers() {
 
       if (token) {
         try {
-          // PERBAIKAN: Gunakan endpoint yang benar /api/sensor/suhu
-          const response = await fetch(
-            "http://localhost:3000/api/sensor/suhu",
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
-            }
-          );
-
-          if (response.ok) {
-            const result = await response.json();
-            console.log("✅ Sensor suhu data:", result);
-
-            if (result.success && result.suhu !== undefined) {
-              // PERBAIKAN: Gunakan data suhu dari response
-              const currentTemp = parseFloat(result.suhu);
-
-              setDryersData({
-                dryer1: currentTemp,
-                dryer2: Math.max(0, currentTemp + (Math.random() - 0.5) * 4),
-                dryer3: Math.max(0, currentTemp + (Math.random() - 0.5) * 4),
-              });
-
-              setIsConnected(!result.usingSimulation);
-              setLastUpdate(new Date());
-              setLoading(false);
-
-              if (result.usingSimulation) {
-                setError("Using simulation data - check ESP32 connection");
-              }
-
-              console.log("✅ Dryers data updated from sensor/suhu endpoint");
-              return;
-            }
-          } else if (response.status === 401 || response.status === 403) {
-            console.warn(
-              "⚠️ Sensor/suhu endpoint unauthorized, trying current"
-            );
-          }
-        } catch (suhuError) {
-          console.warn("⚠️ Sensor/suhu endpoint failed:", suhuError.message);
-        }
-
-        // PERBAIKAN: Fallback ke /api/sensor/current
-        try {
+          // PERBAIKAN: Gunakan endpoint yang benar /api/sensor/current
           const response = await fetch(
             "http://localhost:3000/api/sensor/current",
             {
@@ -83,29 +37,30 @@ export default function Dryers() {
             console.log("✅ Sensor current data:", result);
 
             if (result.success && result.data) {
-              // Process data dari /current endpoint
-              const latestData = result.data[1]; // Ambil data dryer pertama
-              if (latestData) {
-                setDryersData({
-                  dryer1: latestData.suhu || 0,
-                  dryer2: Math.max(
-                    0,
-                    (latestData.suhu || 0) + (Math.random() - 0.5) * 4
-                  ),
-                  dryer3: Math.max(
-                    0,
-                    (latestData.suhu || 0) + (Math.random() - 0.5) * 4
-                  ),
-                });
-                setIsConnected(!result.usingSimulation);
-                setLastUpdate(new Date());
-                setLoading(false);
-                console.log(
-                  "✅ Dryers data updated from sensor/current endpoint"
-                );
-                return;
+              // PERBAIKAN: Gunakan data temperature dari response
+              const currentTemp = parseFloat(result.data.temperature || 0);
+
+              setDryersData({
+                dryer1: currentTemp,
+                dryer2: Math.max(0, currentTemp + (Math.random() - 0.5) * 4),
+                dryer3: Math.max(0, currentTemp + (Math.random() - 0.5) * 4),
+              });
+
+              setIsConnected(result.data.isConnected || false);
+              setLastUpdate(new Date());
+              setLoading(false);
+
+              if (!result.data.isConnected) {
+                setError("Using simulation data - check ESP32 connection");
               }
+
+              console.log(
+                "✅ Dryers data updated from sensor/current endpoint"
+              );
+              return;
             }
+          } else if (response.status === 401 || response.status === 403) {
+            console.warn("⚠️ Sensor/current endpoint unauthorized");
           }
         } catch (currentError) {
           console.warn(
@@ -145,7 +100,7 @@ export default function Dryers() {
     const interval = setInterval(() => {
       console.log("🔄 Refreshing dryers data...");
       fetchDryersData();
-    }, 5000); // PERBAIKAN: Ubah ke 5 detik untuk mengurangi load
+    }, 3000); // PERBAIKAN: Ubah dari 5 detik ke 15 detik untuk mengurangi load
 
     return () => clearInterval(interval);
   }, [token, loading]);

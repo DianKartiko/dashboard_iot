@@ -4,133 +4,6 @@ import ExportControls from "../molecules/ExportControls";
 import TemperatureAggregateTable from "../organism/TemperatureAggregateTable";
 import * as XLSX from "xlsx";
 
-const exportToExcel = async () => {
-  setIsExporting(true);
-  if (aggregateData.length === 0) {
-    handleMessage("Tidak ada data untuk diekspor.", "error");
-    setIsExporting(false);
-    return;
-  }
-
-  try {
-    // PERBAIKAN: Buat data dalam format yang lebih baik untuk Excel
-    const excelData = aggregateData.map((record, index) => ({
-      No: index + 1,
-      ID: record.id,
-      Tanggal: new Date(record.date).toLocaleDateString("id-ID"),
-      "Waktu Slot": record.timeSlot,
-      "Suhu Rata-rata (°C)": Number(record.meanTemp.toFixed(2)),
-      "Suhu Minimum (°C)": Number(record.minTemp.toFixed(2)),
-      "Suhu Maksimum (°C)": Number(record.maxTemp.toFixed(2)),
-      "Jumlah Sample": record.sampleCount,
-      "Median (°C)": record.medianTemp
-        ? Number(record.medianTemp.toFixed(2))
-        : "N/A",
-      "Mode (°C)": record.modeTemp ? Number(record.modeTemp.toFixed(2)) : "N/A",
-      "Standar Deviasi": record.stdDev
-        ? Number(record.stdDev.toFixed(2))
-        : "N/A",
-      "Dibuat Pada": new Date(record.createdAt || record.date).toLocaleString(
-        "id-ID"
-      ),
-      "Status Export": record.isExported ? "Sudah Export" : "Belum Export",
-    }));
-
-    // PERBAIKAN: Buat workbook dengan multiple sheets
-    const workbook = XLSX.utils.book_new();
-
-    // Sheet 1: Data Utama
-    const mainSheet = XLSX.utils.json_to_sheet(excelData);
-
-    // PERBAIKAN: Set column widths untuk readability
-    const colWidths = [
-      { wch: 5 }, // No
-      { wch: 8 }, // ID
-      { wch: 12 }, // Tanggal
-      { wch: 10 }, // Waktu Slot
-      { wch: 18 }, // Suhu Rata-rata
-      { wch: 18 }, // Suhu Minimum
-      { wch: 18 }, // Suhu Maksimum
-      { wch: 15 }, // Jumlah Sample
-      { wch: 12 }, // Median
-      { wch: 12 }, // Mode
-      { wch: 15 }, // Standar Deviasi
-      { wch: 20 }, // Dibuat Pada
-      { wch: 15 }, // Status Export
-    ];
-    mainSheet["!cols"] = colWidths;
-
-    XLSX.utils.book_append_sheet(workbook, mainSheet, "Data Agregasi");
-
-    // Sheet 2: Summary/Statistics
-    const summaryData = [
-      { Metrik: "Total Records", Nilai: stats.totalRecords },
-      {
-        Metrik: "Suhu Rata-rata (°C)",
-        Nilai: Number(stats.avgTemp.toFixed(2)),
-      },
-      { Metrik: "Suhu Minimum (°C)", Nilai: Number(stats.minTemp.toFixed(2)) },
-      { Metrik: "Suhu Maksimum (°C)", Nilai: Number(stats.maxTemp.toFixed(2)) },
-      { Metrik: "Trend (%)", Nilai: Number(stats.trend.toFixed(2)) },
-      { Metrik: "Records Siap Export", Nilai: stats.aggregatesReady },
-      { Metrik: "Tanggal Export", Nilai: new Date().toLocaleString("id-ID") },
-    ];
-
-    const summarySheet = XLSX.utils.json_to_sheet(summaryData);
-    summarySheet["!cols"] = [{ wch: 25 }, { wch: 15 }];
-    XLSX.utils.book_append_sheet(workbook, summarySheet, "Ringkasan");
-
-    // Sheet 3: System Status (jika ada)
-    if (systemStatus) {
-      const statusData = [
-        { Parameter: "Database Buffer", Nilai: systemStatus.databaseBuffer },
-        {
-          Parameter: "Pending Aggregates",
-          Nilai: systemStatus.pendingAggregates,
-        },
-        {
-          Parameter: "Processed Buffer",
-          Nilai: systemStatus.processedBuffer || 0,
-        },
-        { Parameter: "Export Time", Nilai: new Date().toISOString() },
-      ];
-
-      const statusSheet = XLSX.utils.json_to_sheet(statusData);
-      statusSheet["!cols"] = [{ wch: 20 }, { wch: 15 }];
-      XLSX.utils.book_append_sheet(workbook, statusSheet, "Status Sistem");
-    }
-
-    // PERBAIKAN: Generate filename dengan timestamp
-    const timestamp = new Date().toISOString().split("T")[0];
-    const timeString = new Date()
-      .toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-      .replace(":", "");
-    const fileName = `Temperature_Aggregates_${timestamp}_${timeString}.xlsx`;
-
-    // PERBAIKAN: Write dan download file
-    XLSX.writeFile(workbook, fileName, {
-      bookType: "xlsx",
-      type: "binary",
-    });
-
-    setLastExport(new Date().toISOString());
-    handleMessage(`Ekspor Excel berhasil! File: ${fileName}`, "success");
-
-    console.log(`✅ Excel export completed: ${fileName}`);
-  } catch (error) {
-    console.error("❌ Error exporting Excel:", error);
-    handleMessage(
-      `Terjadi kesalahan saat mengekspor Excel: ${error.message}`,
-      "error"
-    );
-  } finally {
-    setIsExporting(false);
-  }
-};
-
 const MessageModal = ({ message, type, onClose }) => {
   const bgColor = {
     info: "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200",
@@ -216,7 +89,7 @@ const TemperatureAggregateDashboard = () => {
       }
 
       const response = await fetch(
-        "http://localhost:5000/api/sensor/aggregate/today",
+        "http://localhost:3000/api/sensor/aggregate/today",
         { headers }
       );
 
@@ -284,7 +157,7 @@ const TemperatureAggregateDashboard = () => {
         headers.Authorization = `Bearer ${token}`;
       }
 
-      const response = await fetch("http://localhost:5000/api/system/status", {
+      const response = await fetch("http://localhost:3000/api/sensor/status", {
         headers,
       });
 
@@ -373,32 +246,124 @@ const TemperatureAggregateDashboard = () => {
       setIsExporting(false);
       return;
     }
+
     try {
-      const jsonData = aggregateData.map((record) => ({
+      // PERBAIKAN: Buat data dalam format yang lebih baik untuk Excel
+      const excelData = aggregateData.map((record, index) => ({
+        No: index + 1,
         ID: record.id,
-        Date: new Date(record.date).toLocaleDateString("id-ID"),
-        "Time Slot": record.timeSlot,
-        "Mean Temperature (°C)": record.meanTemp.toFixed(2),
-        "Min Temperature (°C)": record.minTemp.toFixed(2),
-        "Max Temperature (°C)": record.maxTemp.toFixed(2),
-        "Sample Count": record.sampleCount,
-        "Created At": new Date(record.createdAt || record.date).toISOString(),
-        "Export Status": record.isExported ? "Exported" : "Pending",
+        Tanggal: new Date(record.date).toLocaleDateString("id-ID"),
+        "Waktu Slot": record.timeSlot,
+        "Suhu Rata-rata (°C)": Number(record.meanTemp.toFixed(2)),
+        "Suhu Minimum (°C)": Number(record.minTemp.toFixed(2)),
+        "Suhu Maksimum (°C)": Number(record.maxTemp.toFixed(2)),
+        "Jumlah Sample": record.sampleCount,
+        "Median (°C)": record.medianTemp
+          ? Number(record.medianTemp.toFixed(2))
+          : "N/A",
+        "Mode (°C)": record.modeTemp
+          ? Number(record.modeTemp.toFixed(2))
+          : "N/A",
+        "Standar Deviasi": record.stdDev
+          ? Number(record.stdDev.toFixed(2))
+          : "N/A",
+        "Dibuat Pada": new Date(record.createdAt || record.date).toLocaleString(
+          "id-ID"
+        ),
+        "Status Export": record.isExported ? "Sudah Export" : "Belum Export",
       }));
-      const jsonString = JSON.stringify(jsonData, null, 2);
-      const blob = new Blob([jsonString], { type: "application/json" });
-      const link = document.createElement("a");
-      const fileName = `temperature_aggregates_${
-        new Date().toISOString().split("T")[0]
-      }.json`;
-      link.href = URL.createObjectURL(blob);
-      link.download = fileName;
-      link.click();
+
+      // PERBAIKAN: Buat workbook dengan multiple sheets
+      const workbook = XLSX.utils.book_new();
+
+      // Sheet 1: Data Utama
+      const mainSheet = XLSX.utils.json_to_sheet(excelData);
+
+      // PERBAIKAN: Set column widths untuk readability
+      const colWidths = [
+        { wch: 5 }, // No
+        { wch: 8 }, // ID
+        { wch: 12 }, // Tanggal
+        { wch: 10 }, // Waktu Slot
+        { wch: 18 }, // Suhu Rata-rata
+        { wch: 18 }, // Suhu Minimum
+        { wch: 18 }, // Suhu Maksimum
+        { wch: 15 }, // Jumlah Sample
+        { wch: 12 }, // Median
+        { wch: 12 }, // Mode
+        { wch: 15 }, // Standar Deviasi
+        { wch: 20 }, // Dibuat Pada
+        { wch: 15 }, // Status Export
+      ];
+      mainSheet["!cols"] = colWidths;
+
+      XLSX.utils.book_append_sheet(workbook, mainSheet, "Data Agregasi");
+
+      // Sheet 2: Summary/Statistics
+      const summaryData = [
+        { Metrik: "Total Records", Nilai: stats.totalRecords },
+        {
+          Metrik: "Suhu Rata-rata (°C)",
+          Nilai: Number(stats.avgTemp.toFixed(2)),
+        },
+        {
+          Metrik: "Suhu Minimum (°C)",
+          Nilai: Number(stats.minTemp.toFixed(2)),
+        },
+        {
+          Metrik: "Suhu Maksimum (°C)",
+          Nilai: Number(stats.maxTemp.toFixed(2)),
+        },
+        { Metrik: "Trend (%)", Nilai: Number(stats.trend.toFixed(2)) },
+        { Metrik: "Records Siap Export", Nilai: stats.aggregatesReady },
+        { Metrik: "Tanggal Export", Nilai: new Date().toLocaleString("id-ID") },
+      ];
+
+      const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+      summarySheet["!cols"] = [{ wch: 25 }, { wch: 15 }];
+      XLSX.utils.book_append_sheet(workbook, summarySheet, "Ringkasan");
+
+      // Sheet 3: System Status (jika ada)
+      if (systemStatus) {
+        const statusData = [
+          { Parameter: "Database Buffer", Nilai: systemStatus.databaseBuffer },
+          {
+            Parameter: "Pending Aggregates",
+            Nilai: systemStatus.pendingAggregates,
+          },
+          {
+            Parameter: "Processed Buffer",
+            Nilai: systemStatus.processedBuffer || 0,
+          },
+          { Parameter: "Export Time", Nilai: new Date().toISOString() },
+        ];
+
+        const statusSheet = XLSX.utils.json_to_sheet(statusData);
+        statusSheet["!cols"] = [{ wch: 20 }, { wch: 15 }];
+        XLSX.utils.book_append_sheet(workbook, statusSheet, "Status Sistem");
+      }
+
+      // PERBAIKAN: Generate filename dengan timestamp
+      const timestamp = new Date().toISOString().split("T")[0];
+      const timeString = new Date()
+        .toLocaleTimeString("id-ID", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+        .replace(":", "");
+      const fileName = `Temperature_Aggregates_${timestamp}_${timeString}.xlsx`;
+
+      // PERBAIKAN: Write dan download file
+      XLSX.writeFile(workbook, fileName, {
+        bookType: "xlsx",
+        type: "binary",
+      });
+
       setLastExport(new Date().toISOString());
-      handleMessage("Ekspor Excel/JSON berhasil!", "success");
+      handleMessage(`Ekspor Excel berhasil! File: ${fileName}`, "success");
     } catch (error) {
       console.error("❌ Error exporting Excel:", error);
-      handleMessage("Terjadi kesalahan saat mengekspor Excel/JSON.", "error");
+      handleMessage("Terjadi kesalahan saat mengekspor Excel.", "error");
     } finally {
       setIsExporting(false);
     }

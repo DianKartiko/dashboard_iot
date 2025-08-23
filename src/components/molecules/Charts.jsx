@@ -200,23 +200,20 @@ export default function Charts() {
           if (response.ok) {
             const result = await response.json();
             if (result.success && result.data) {
-              // PERBAIKAN: Akses data sensor yang benar
-              const sensorsData = result.data;
-              const currentSensor =
-                sensorsData["1"] || sensorsData[Object.keys(sensorsData)[0]];
+              // PERBAIKAN: Gunakan struktur data yang benar (sama seperti Dryers.jsx)
+              const currentTemp = parseFloat(result.data.temperature || 0);
 
-              if (currentSensor) {
-                const newTemp = parseFloat(currentSensor.suhu);
-                setCurrentTemp(newTemp);
-                setIsConnected(true);
+              if (currentTemp > 0) {
+                setCurrentTemp(currentTemp);
+                setIsConnected(result.data.isConnected || false);
 
                 // Jika tidak ada chart data, buat dari current temp
                 if (chartData.length === 0) {
-                  await generateFallbackData(newTemp);
+                  await generateFallbackData(currentTemp);
                 }
                 console.log(
                   "✅ Current temperature from protected endpoint:",
-                  newTemp
+                  currentTemp
                 );
                 return;
               }
@@ -245,19 +242,22 @@ export default function Charts() {
         if (fallbackResponse.ok) {
           const fallbackData = await fallbackResponse.json();
 
-          if (fallbackData.success && fallbackData.suhu) {
-            const newTemp = parseFloat(fallbackData.suhu);
-            setCurrentTemp(newTemp);
-            setIsConnected(!fallbackData.usingSimulation);
+          if (fallbackData.success && fallbackData.data) {
+            // PERBAIKAN: Gunakan struktur data yang benar untuk /suhu endpoint
+            const newTemp = parseFloat(fallbackData.data.temperature || 0);
+            if (newTemp > 0) {
+              setCurrentTemp(newTemp);
+              setIsConnected(fallbackData.data.isConnected || false);
 
-            if (chartData.length === 0) {
-              await generateFallbackData(newTemp);
+              if (chartData.length === 0) {
+                await generateFallbackData(newTemp);
+              }
+              console.log(
+                "✅ Current temperature from fallback endpoint:",
+                newTemp
+              );
+              return;
             }
-            console.log(
-              "✅ Current temperature from fallback endpoint:",
-              newTemp
-            );
-            return;
           }
         }
       } catch (fallbackError) {
@@ -451,7 +451,7 @@ export default function Charts() {
       console.log("🔄 Updating realtime data...");
       fetchCurrentTemperature();
       fetchTodayAggregateData();
-    }, 10000); // 10 detik
+    }, 30000); // PERBAIKAN: Ubah dari 10 detik ke 30 detik untuk mengurangi load
 
     return () => clearInterval(realtimeInterval);
   }, [token]); // PERBAIKAN: Depend on token
